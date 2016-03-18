@@ -32,13 +32,14 @@ function plot(data, winID, winTitle, rawStr, save)
   local ys = yr/2
   
   if opt.norm_mean ~= nil and opt.norm_mean == 0 then ys = 0 end
-  local rangeStr = string.format("set xrange [%d:%d]; set yrange [%f:%f]",0,opt.temp_win+1,-ys,yr-ys)
---   print(rangeStr)
---   abort()
+  
+  if opt.temp_win ~= nil then
+    local rangeStr = string.format("set xrange [%d:%d]; set yrange [%f:%f]",0,opt.temp_win+1,-ys,yr-ys)
    
---   local rangeStr = string.format("set xrange [%d:%d]; set autoscale y",0,opt.temp_win+1)
-  gnuplot.raw('set key outside left yrange [0:0.2]')  
-  gnuplot.raw(rangeStr)
+  --   local rangeStr = string.format("set xrange [%d:%d]; set autoscale y",0,opt.temp_win+1)
+    gnuplot.raw('set key outside left yrange [0:0.2]')  
+    gnuplot.raw(rangeStr)
+  end
 
 --     gnuplot.raw('set xlabel "frame"')
 --     print(data)

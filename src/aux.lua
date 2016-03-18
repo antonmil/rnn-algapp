@@ -56,6 +56,8 @@ function permuteCost(cost)
   
 end
 
+--------------------------------------------------------------------------
+--- Generate Data for Hungarian training
 function genHunData(nSamples)
 --   if opt.permute ~= 0 then error('permutation not implemented') end
   local CostTab, HunTab = {},{}
@@ -66,31 +68,46 @@ function genHunData(nSamples)
       print((n)*(100/(nSamples))..' %...') 
     end
     
-    if n==1 or opt.permute<=1 or (opt.permute>1 and n%opt.permute == 0) then
-      oneCost = getOneCost()
-    else
---       print('permuting?')
-      oneCost = permuteCost(oneCost)
-    end
+--    if n==1 or opt.permute<=1 or (opt.permute>1 and n%opt.permute == 0) then
+--      oneCost = getOneCost()
+--    else
+----       print('permuting?')
+--      oneCost = permuteCost(oneCost)
+--    end
+    local oneCost = -torch.log(torch.rand(opt.mini_batch_size, opt.max_n * opt.nClasses) ) 
     
-    
-    --     oneCost = oneCost:cat(torch.ones(opt.mini_batch_size, opt.max_n)*missThr)
---     print(oneCost)
---     abort()
+--    print(oneCost)
+--    abort()
+
     oneCost = dataToGPU(oneCost)
     table.insert(CostTab, oneCost)
     
-    local hunSols = torch.ones(1,opt.max_n):int()
+--    local hunSols = torch.ones(1,opt.max_n):int()
+--    for m=1,opt.mini_batch_size do
+--      local costmat = oneCost[m]:reshape(opt.max_n, opt.nClasses)    
+--      local ass = hungarianL(costmat)
+--      hunSols = hunSols:cat(ass[{{},{2}}]:reshape(1,opt.max_n):int(), 1)    
+--    end
+--    hunSols=hunSols:sub(2,-1)
+
+    local hunSols = torch.ones(1,opt.max_n*opt.max_m):float()
     for m=1,opt.mini_batch_size do
       local costmat = oneCost[m]:reshape(opt.max_n, opt.nClasses)    
-      local ass = hungarianL(costmat)
-      hunSols = hunSols:cat(ass[{{},{2}}]:reshape(1,opt.max_n):int(), 1)    
+
+      local mar = getMarginals(costmat):reshape(1,opt.max_n*opt.max_m)
+--      print(mar)
+--      print(hunSols)
+      hunSols = hunSols:cat(mar  ,1)    
     end
     hunSols=hunSols:sub(2,-1)
+    
     table.insert(HunTab, hunSols)    
   end
   return CostTab, HunTab
 end
+
+
+
 
 --------------------------------------------------------------------------
 --- get all inputs for one time step
@@ -127,4 +144,67 @@ function decode(predictions, tar)
     end
   end
   return DA
+end
+
+--------------------------------------------------------------------------
+--- print all values for looking at them :)
+-- @param C   The cost matrix
+function printDebugValues(C, PredC)
+
+  local N,M = getDataSize(C)
+  local probMat = torch.exp(-C)
+  for i = 1,N do
+    probMat[i] = probMat[i]/torch.sum(probMat[i])
+  end
+  
+  
+--  print('Cost matrix')
+  local minv, mini = torch.min(C,2)
+  minv=minv:reshape(N) mini=mini:reshape(N)
+  
+  local HunAss = hungarianL(C)
+  local marginals = getMarginals(C)
+  
+  local mmaxv, mmaxi = torch.max(marginals,2)
+  mmaxv=mmaxv:reshape(N) mmaxi=mmaxi:reshape(N)  
+  
+  local pmmaxv, pmmaxi = torch.max(PredC,2)
+  pmmaxv=pmmaxv:reshape(N) pmmaxi=pmmaxi:reshape(N)  
+    
+
+  print(string.format('%5s%5s%5s%5s%5s%5s|    ------  Prob ------  |    -------  Marg ------- |  -- Predicted Marg -- ','i','NN','HA','Mar','PMar','Err'))
+  c = sys.COLORS  
+  for i=1,N do
+    local prLine = ''
+    prLine = prLine .. string.format('%5d%5d%5d%5d%5d%5d|',i,mini[i],HunAss[i][2],mmaxi[i],pmmaxi[i],mmaxi[i]-pmmaxi[i]) 
+    for j=1,M do
+--      prLine = prLine ..  string.format('%8.4f',C[i][j])
+        prLine = prLine ..  string.format('%8.4f',probMat[i][j])
+    end
+    prLine = prLine .. ' | '
+    for j=1,M do
+      prLine = prLine ..  string.format('%8.4f',marginals[i][j])
+    end
+    prLine = prLine .. ' | '
+    for j=1,M do
+      prLine = prLine ..  string.format('%8.4f',torch.exp(PredC[i][j]))
+    end
+    
+--    prLine=prLine..'\n'
+    print(prLine)
+  end
+--  print(C)
+--  print(mini)
+--  print(C:index(1,mini))
+--  print(string.format('%8s%8.4f%8.4f%8.4f|  ---  Cost ---','-',torch.sum(C[mini]),torch.sum(C[mmaxi]),0))
+  
+--  print('NN')
+--  print(mini)
+--  print('Hungarian')
+--  print(HunAss)
+--  print('Marginals')
+--  print(marginals)    
+--  print(mmaxi)
+  
+  
 end
