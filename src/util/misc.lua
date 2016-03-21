@@ -2240,107 +2240,43 @@ function createAuxDirs()
 end
 
 
-
-function getMarginals(C)
-
-  local N,M = getDataSize(C)
+--------------------------------------------------------------------------
+--- Compute marginal assignment distributions 
+-- @param P     The probability matrix
+-- @param solTable  A table containing all feasible assignments
+function getMarginals(P, solTable)
+ 
+  local N,M = getDataSize(P)
   local marginals = torch.zeros(N,M):float()
-  
-  local feasSol, infSol = {}, {}
-  
-  local assFile = 'tmp/ass_n'..N..'_m'..M..'.t7'
-  local assContent = {}
-  
-  if lfs.attributes(assFile) then 
-    assContent = torch.load(assFile)
-    feasSol = assContent.feasSol
-  else
-  local possibleAssignments = math.pow(2,N*M)
-  
-  
 
-  for s=1,possibleAssignments do
-    local binCode = torch.Tensor(toBits(s, N*M))
-    ass = binCode:reshape(N,M)
-  --   print(ass)
-    local feasible = true
-    local sumAllEntries = torch.sum(binCode)
-    local sumOverColumns = torch.sum(ass,2) -- ==
-    local sumOverRows = torch.sum(ass,1) -- ==
---    local sumOverRows = torch.sum(ass:narrow(2,1,N),1) -- <=  (this is for missed det case)
-    local allOnes = torch.ones(N, 1)
-  --   print(sumOverColumns:ne(1))
-  --   print(torch.sum(sumOverRows:gt(1)))
-    
-  --   print(ass)
-    if sumAllEntries ~= N then
-      feasible = false 
-  --     print('incorrect sum of assignments maxTar assigments '..sumAllEntries)
-    elseif torch.sum(sumOverColumns:ne(1)) > 0 then
-      feasible = false
-  --     print('incorrect column sum '..torch.sum(sumOverColumns:ne(1)))
---    elseif torch.sum(sumOverRows:gt(1)) > 0 then -- (missed det case)
-    elseif torch.sum(sumOverRows:ne(1)) > 0 then
-      feasible = false
-  --     print('incorrect row sum '..torch.sum(sumOverRows:gt(1)))
-    end
-    
-  --   print(feasible)
-    if feasible then
-      table.insert(feasSol, ass)
---      print(ass)      
-    else    
-      table.insert(infSol, ass)
-    end
-    
+  
+  for key, var in pairs(solTable.feasSol) do
+  	local idx = var:eq(1)              -- find assignments
+  	local hypProb = torch.sum(P[idx])  -- gather probabilites
+  	marginals[idx] = marginals[idx] + hypProb   -- add to joint matrix
   end
-    assContent = {}
-    assContent.feasSol = feasSol
-    assContent.infSol = infSol
-    torch.save(assFile, assContent)
-  end
-  
-  
---  abort()
 
-  
-  for key, var in pairs(feasSol) do
-  	local idx = var:eq(1)
-  	local hypCost = torch.sum(C[idx])
-  	marginals[idx] = marginals[idx] + torch.exp(-hypCost)
---  	print(var)
---  	print(marginals)
-  end
---  abort()
 
-  for n=1,N do
-  	marginals[n] = marginals[n] / torch.sum(marginals[n])
-  end
-  
-  	
+  marginals = makeProb(marginals) -- make probability
 
---  local retMargSol = torch.zeros(1, N*M)
---  for mb = 1,opt.mini_batch_size do
---    local randSol = math.random(tabLen(infSol))
---    retInfSol = retInfSol:cat(infSol[randSol]:reshape(N,M),1)
---  end
---  retInfSol = retInfSol:sub(2,-1)    
-
-  local mv,mi = torch.min(C,2)
-  local mmv,mmi = torch.max(marginals,2) 
---  print('---')
---  print(C)
---  print(mi)
---  print(hungarianL(C))
---  print(marginals)
---  print(torch.max(marginals,2))
---  sleep(5)    
---if torch.sum(mi:reshape(opt.max_n):float() - mmi:reshape(opt.max_n):float()) > 0 then
---abort()
---end
-    
   marginals = dataToGPU(marginals)
   return marginals
 
   
+end
+
+function probToCost(P)
+  return -torch.log(P)
+end
+
+function costToProb(C)  
+  local P = torch.exp(-C)     -- convert cost to Pseudo-probabilities
+  P = makeProb(P)             -- normalize row-wise
+  return P
+end
+
+function makeProb(P)
+  local N,M = getDataSize(P)  -- get size of cost matrix
+  for i=1,N do P[i] = P[i]/torch.sum(P[i]) end  -- normalize row-wise
+  return P
 end

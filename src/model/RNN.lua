@@ -102,6 +102,7 @@ function RNN.rnn(opt)
     description='data assoc. LogSoftMax',
     graphAttributes = {color='green'}
   }
+--   daFinal = nn.Sigmoid()(localDaRes)
 
 
 

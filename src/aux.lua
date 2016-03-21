@@ -60,8 +60,13 @@ end
 --- Generate Data for Hungarian training
 function genHunData(nSamples)
 --   if opt.permute ~= 0 then error('permutation not implemented') end
-  local CostTab, HunTab = {},{}
+  local ProbTab, HunTab = {},{}
   local missThr = opt.miss_thr
+  
+  
+--  print(solTable)
+--  abort()
+  
   for n=1,nSamples do
     
     if n%math.floor(nSamples/5)==0 then 
@@ -74,13 +79,18 @@ function genHunData(nSamples)
 ----       print('permuting?')
 --      oneCost = permuteCost(oneCost)
 --    end
-    local oneCost = -torch.log(torch.rand(opt.mini_batch_size, opt.max_n * opt.nClasses) ) 
+    local randN = math.random(10) 
+    local randProb = torch.randn(opt.mini_batch_size, opt.max_n * opt.nClasses)
+--    print(randProb)
+--    abort()
+    local oneProb = torch.pow(torch.abs(randProb ),randN)
+    oneProb = makeProb(oneProb) 
     
 --    print(oneCost)
 --    abort()
 
-    oneCost = dataToGPU(oneCost)
-    table.insert(CostTab, oneCost)
+    oneProb = dataToGPU(oneProb)
+    table.insert(ProbTab, oneProb)
     
 --    local hunSols = torch.ones(1,opt.max_n):int()
 --    for m=1,opt.mini_batch_size do
@@ -92,9 +102,9 @@ function genHunData(nSamples)
 
     local hunSols = torch.ones(1,opt.max_n*opt.max_m):float()
     for m=1,opt.mini_batch_size do
-      local costmat = oneCost[m]:reshape(opt.max_n, opt.nClasses)    
+      local probMat = oneProb[m]:reshape(opt.max_n, opt.nClasses)    
 
-      local mar = getMarginals(costmat):reshape(1,opt.max_n*opt.max_m)
+      local mar = getMarginals(probMat,solTable):reshape(1,opt.max_n*opt.max_m)
 --      print(mar)
 --      print(hunSols)
       hunSols = hunSols:cat(mar  ,1)    
@@ -103,11 +113,51 @@ function genHunData(nSamples)
     
     table.insert(HunTab, hunSols)    
   end
-  return CostTab, HunTab
+  return ProbTab, HunTab
 end
 
+function findFeasibleSolutions(N,M)
+--  local assFile = 'tmp/ass_n'..N..'_m'..M..'.t7'
 
+  local feasSol, infSol = {}, {}
+  local possibleAssignments = math.pow(2,N*M)
 
+  for s=1,possibleAssignments do
+    local binCode = torch.Tensor(toBits(s, N*M))
+    local ass = binCode:reshape(N,M)
+    local feasible = true
+    local sumAllEntries = torch.sum(binCode)
+    local sumOverColumns = torch.sum(ass,2) -- ==
+    local sumOverRows = torch.sum(ass,1) -- ==
+--    local sumOverRows = torch.sum(ass:narrow(2,1,N),1) -- <=  (this is for missed det case)
+    local allOnes = torch.ones(N, 1)
+    
+  --   print(ass)
+    if sumAllEntries ~= N then
+      feasible = false --     print('incorrect sum of assignments maxTar assigments '..sumAllEntries)
+    elseif torch.sum(sumOverColumns:ne(1)) > 0 then
+      feasible = false --     print('incorrect column sum '..torch.sum(sumOverColumns:ne(1)))
+    elseif torch.sum(sumOverRows:ne(1)) > 0 then
+      feasible = false  --     print('incorrect row sum '..torch.sum(sumOverRows:gt(1)))
+    end
+    
+  --   print(feasible)
+    if feasible then
+      table.insert(feasSol, ass)
+--      print(ass)      
+    else    
+      table.insert(infSol, ass)
+    end
+    
+  end
+    solTable = {}
+    solTable.feasSol = feasSol
+    solTable.infSol = infSol
+--      torch.save(assFile, solTable)
+
+  return solTable
+  
+end
 
 --------------------------------------------------------------------------
 --- get all inputs for one time step
@@ -118,7 +168,7 @@ function getRNNInput(t, rnn_state, predictions)
   local rnninp = {}
   
   -- Cost matrix
-  local loccost = costs:clone():reshape(opt.mini_batch_size, opt.max_n*opt.nClasses)
+  local loccost = probs:clone():reshape(opt.mini_batch_size, opt.max_n*opt.nClasses)
   table.insert(rnninp, loccost)
   
   for i = 1,#rnn_state[t-1] do table.insert(rnninp,rnn_state[t-1][i]) end
@@ -146,16 +196,24 @@ function decode(predictions, tar)
   return DA
 end
 
+function getDebugTableTitle(str)
+  local formatString = string.format('%%%ds',opt.max_m * 8+1)
+  return string.format(formatString, '--- '..str..' --- ')
+end
+
+
 --------------------------------------------------------------------------
 --- print all values for looking at them :)
--- @param C   The cost matrix
-function printDebugValues(C, PredC)
+-- @param P     The probability matrix
+-- @param PredP Predicted (marginal) probabilities matrix
+function printDebugValues(P, PredP)
 
-  local N,M = getDataSize(C)
-  local probMat = torch.exp(-C)
-  for i = 1,N do
-    probMat[i] = probMat[i]/torch.sum(probMat[i])
-  end
+  local C = probToCost(P) -- negative log-probability (cost)
+  local N,M = getDataSize(P)
+--  local P = torch.exp(-C)
+--  for i = 1,N do
+--    P[i] = P[i]/torch.sum(P[i])
+--  end
   
   
 --  print('Cost matrix')
@@ -163,36 +221,46 @@ function printDebugValues(C, PredC)
   minv=minv:reshape(N) mini=mini:reshape(N)
   
   local HunAss = hungarianL(C)
-  local marginals = getMarginals(C)
+  local marginals = getMarginals(P,solTable)
   
   local mmaxv, mmaxi = torch.max(marginals,2)
   mmaxv=mmaxv:reshape(N) mmaxi=mmaxi:reshape(N)  
   
-  local pmmaxv, pmmaxi = torch.max(PredC,2)
+  local pmmaxv, pmmaxi = torch.max(PredP,2)
   pmmaxv=pmmaxv:reshape(N) pmmaxi=pmmaxi:reshape(N)  
     
+    
 
-  print(string.format('%5s%5s%5s%5s%5s%5s|    ------  Prob ------  |    -------  Marg ------- |  -- Predicted Marg -- ','i','NN','HA','Mar','PMar','Err'))
-  c = sys.COLORS  
+  print(string.format('%5s%5s%5s%5s%5s%5s|%s|%s|%s','i','NN','HA','Mar','PMar','Err',
+        getDebugTableTitle('Prob'),getDebugTableTitle('Marg'),getDebugTableTitle('Predicted Marg')))
+  local c = sys.COLORS  
   for i=1,N do
     local prLine = ''
     prLine = prLine .. string.format('%5d%5d%5d%5d%5d%5d|',i,mini[i],HunAss[i][2],mmaxi[i],pmmaxi[i],mmaxi[i]-pmmaxi[i]) 
     for j=1,M do
 --      prLine = prLine ..  string.format('%8.4f',C[i][j])
-        prLine = prLine ..  string.format('%8.4f',probMat[i][j])
+        prLine = prLine ..  string.format('%8.4f',P[i][j])
     end
-    prLine = prLine .. ' | '
+    prLine = prLine .. ' |'
     for j=1,M do
       prLine = prLine ..  string.format('%8.4f',marginals[i][j])
     end
-    prLine = prLine .. ' | '
+    prLine = prLine .. ' |'
     for j=1,M do
-      prLine = prLine ..  string.format('%8.4f',torch.exp(PredC[i][j]))
+      prLine = prLine ..  string.format('%8.4f',PredP[i][j])
     end
     
 --    prLine=prLine..'\n'
     print(prLine)
   end
+--  print(probMat)
+--  print(mini:long():reshape(N,1))
+  local NNcost = torch.sum(P:gather(2,mini:long():reshape(N,1)))
+  local HAcost = torch.sum(P:gather(2,HunAss:narrow(2,2,1):long():reshape(N,1)))
+  local Marcost = torch.sum(P:gather(2,mmaxi:long():reshape(N,1)))
+  local PMarcost = torch.sum(P:gather(2,pmmaxi:long():reshape(N,1)))
+--  print(NNcost,HAcost,Marcost,PMarcost)
+  print(string.format('%5s%5.2f%5.2f%5.2f%5.2f','sum',NNcost,HAcost,Marcost,PMarcost))
 --  print(C)
 --  print(mini)
 --  print(C:index(1,mini))

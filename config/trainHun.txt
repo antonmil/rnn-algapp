@@ -18,9 +18,9 @@
                
             init_from  
         training_file  
-           max_epochs  200000
+           max_epochs  20000
       mini_batch_size  10
-       synth_training  50
+       synth_training  1000
           synth_valid  10
              full_set  0
 

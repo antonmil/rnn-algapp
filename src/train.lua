@@ -169,9 +169,11 @@ pm('   ...done',2)
 
 
 ----- gen data for Hungarian
-TrCostTab,TrSolTab = genHunData(opt.synth_training)
-ValCostTab,ValSolTab = genHunData(opt.synth_valid)
+solTable =  findFeasibleSolutions(opt.max_n, opt.max_m) -- get feasible solutions
+TrProbTab,TrSolTab = genHunData(opt.synth_training)
+ValProbTab,ValSolTab = genHunData(opt.synth_valid)
 
+--abort()
 --- gen for marginals
 --TrCostTab,TrSolTab = genMarData(opt.synth_training)
 --ValCostTab,ValSolTab = genMarData(opt.synth_valid)
@@ -188,6 +190,7 @@ function getGTDA(tar)
   local offset = opt.max_n * (tar-1)+1
   
   DA = huns[{{},{offset, offset+opt.max_n-1}}]
+--  DA = torch.log(DA)
 
   return DA
 end
@@ -206,12 +209,12 @@ end
 
 function eval_val()  
 
-  local tL = tabLen(ValCostTab)
+  local tL = tabLen(ValProbTab)
   local loss = 0
   local T = opt.max_n
   local plotSeq = math.random(tL)
   for seq=1,tL do
-    costs = ValCostTab[seq]:clone()
+    probs = ValProbTab[seq]:clone()
     huns = ValSolTab[seq]:clone()
 
     TRAINING = false
@@ -231,8 +234,8 @@ function eval_val()
       local rnninp, rnn_state = getRNNInput(t, rnn_state, predictions)    -- get combined RNN input table
       local lst = clones.rnn[t]:forward(rnninp) -- do one forward tick
       predictions[t] = lst
-      --     print(lst)
-      --     abort()
+--           print(lst)
+--           abort()
 
       rnn_state[t] = {}
       for i=1,#init_state do table.insert(rnn_state[t], lst[i]) end -- extract the state, without output
@@ -247,59 +250,26 @@ function eval_val()
 
 
     if seq==plotSeq then
-      local predDA = decode(predictions):reshape(opt.mini_batch_size*opt.max_n,opt.nClasses):sub(1,opt.max_n)
+      local logpredDA = decode(predictions):reshape(opt.mini_batch_size*opt.max_n,opt.nClasses):sub(1,opt.max_n)
+      local predDA=costToProb(logpredDA)
+      
       local hun = huns:sub(1,1)
-      local cmtr = costs:reshape(opt.mini_batch_size*opt.max_n, opt.nClasses):sub(1,opt.max_n)
+      local cmtr = probs:reshape(opt.mini_batch_size*opt.max_n, opt.nClasses):sub(1,opt.max_n)
 --      print(predDA)
 --      print(costs)
       printDebugValues(cmtr:reshape(opt.max_n,opt.max_m), predDA:reshape(opt.max_n, opt.max_m))
---      print('cost matrix')
---      print(cmtr)
---      print('Hungarian')
---      print(hun)
---      --   print(torch.exp(predDA))
---      --   print(torch.exp)
---      predDA = torch.exp(predDA)
---      local mv, mi = torch.max(predDA,2)
---      mv=mv:reshape(opt.max_n)
---      mi=mi:reshape(opt.max_n)
---
---      local minv, mini = torch.min(cmtr,2)
---      --       print(minv)
---      --       print(mini)
---      minv=minv:reshape(opt.max_n)
---      mini=mini:reshape(opt.max_n)
---
---      print('Min Cost')
---      print(mini:reshape(1,opt.max_n))
---
---
---      print('Prediction')
---      print(mi:reshape(1,opt.max_n))
---      for tar=1,opt.max_n do
---        local probLine = ''
---        probLine = probLine .. string.format("%d\t",mi[tar])
---        for c=1,opt.nClasses do
---          --       print(predDA)
---          --       print(tar,c)
---          --       print(torch.exp(predDA[1][tar][c]):squeeze())
---          --       print(string.format("%d %d %.5f\t",tar,c,predDA[tar][c]))
---
---          probLine = probLine .. string.format("%6.4f\t",predDA[tar][c])
---        end    
---        print(probLine)
---      end
---      print(predDA)
---      print(hun)
-    local marginals = getMarginals(cmtr) 
---    local mmaxv, mmaxi = torch.max(marginals,2)
+
+    local marginals = getMarginals(cmtr,solTable)
+    local mmaxv, mmaxi = torch.max(marginals,2)
+    local pmmaxv, pmmaxi = torch.max(predDA,2)
+    eval_val_mm = torch.sum(torch.abs(mmaxi-pmmaxi):ne(0))
     
 --      eval_val_mm = getDAErrorHUN(predDA:reshape(opt.max_n,1,opt.nClasses), mmaxi:reshape(opt.max_n,1))
       --       print(eval_val_mm)
       --       abort()
     end    
 
-         eval_val_mm = 0
+--         eval_val_mm = 0
     eval_val_multass = 0
   end
   loss = loss / T / tL  -- make average over all frames
@@ -314,14 +284,14 @@ seqCnt=0
 function feval()  
   grad_params:zero()
 
-  local tL = tabLen(TrCostTab)
+  local tL = tabLen(TrProbTab)
 
   seqCnt=seqCnt+1
-  if seqCnt > tabLen(TrCostTab) then seqCnt = 1 end
+  if seqCnt > tabLen(TrProbTab) then seqCnt = 1 end
   randSeq = seqCnt
 
   randSeq = math.random(tL) -- pick a random sequence from training set
-  costs = TrCostTab[randSeq]:clone()
+  probs = TrProbTab[randSeq]:clone()
   huns = TrSolTab[randSeq]:clone()
 
   TRAINING = true
@@ -341,17 +311,23 @@ function feval()
     local rnninp, rnn_state = getRNNInput(t, rnn_state, predictions)    -- get combined RNN input table
     local lst = clones.rnn[t]:forward(rnninp) -- do one forward tick
     predictions[t] = lst
-    --     print(lst)
-    --     abort()
+--         print(lst)
+--         abort()
 
     rnn_state[t] = {}
     for i=1,#init_state do table.insert(rnn_state[t], lst[i]) end -- extract the state, without output
     DA[t] = decode(predictions, t)
-    --     print(DA[t])
+--         print(DA[t])
+--         abort()
     local input, output = getPredAndGTTables(DA[t], t)
+--    print(input[1])
+--    print(output[1])
+--    abort()
 
     local tloss = clones.criterion[t]:forward(input, output)
     loss = loss + tloss
+--    print(tloss)
+--    abort()
   end
   loss = loss / T -- make average over all frames
   local predDA = decode(predictions)
