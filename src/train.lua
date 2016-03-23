@@ -167,9 +167,28 @@ end
 pm('   ...done',2)
 
 
+--local N,M = 3,3
+--local ass=torch.zeros(N*M)
+--for p1=1,M do  
+--  for p2=1,M do  if p2~=p1 then
+--    for p3=1,M do  if p3~=p1 and p3~=p2 then
+----      print(p1,p2,p3)
+--      local ass=torch.zeros(N,M)
+--      ass[1][p1]=1
+--      ass[2][p2]=1
+--      ass[3][p3]=1
+--      print(ass)
+--    end end
+--  end end
+--end
+
+
+
 
 ----- gen data for Hungarian
 solTable =  findFeasibleSolutions(opt.max_n, opt.max_m) -- get feasible solutions
+--print(solTable)
+--abort()
 TrProbTab,TrSolTab = genHunData(opt.synth_training)
 ValProbTab,ValSolTab = genHunData(opt.synth_valid)
 
@@ -251,7 +270,7 @@ function eval_val()
 
     if seq==plotSeq then
       local logpredDA = decode(predictions):reshape(opt.mini_batch_size*opt.max_n,opt.nClasses):sub(1,opt.max_n)
-      local predDA=costToProb(logpredDA)
+      local predDA=costToProb(-logpredDA)
       
       local hun = huns:sub(1,1)
       local cmtr = probs:reshape(opt.mini_batch_size*opt.max_n, opt.nClasses):sub(1,opt.max_n)

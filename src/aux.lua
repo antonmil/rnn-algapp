@@ -79,12 +79,15 @@ function genHunData(nSamples)
 ----       print('permuting?')
 --      oneCost = permuteCost(oneCost)
 --    end
-    local randN = math.random(10) 
-    local randProb = torch.randn(opt.mini_batch_size, opt.max_n * opt.nClasses)
+    local randN = math.random(5) 
+    local randProb = torch.rand(opt.mini_batch_size, opt.max_n * opt.nClasses)
 --    print(randProb)
 --    abort()
     local oneProb = torch.pow(torch.abs(randProb ),randN)
-    oneProb = makeProb(oneProb) 
+--    print(oneProb)
+    oneProb = makeProb(oneProb:reshape(opt.mini_batch_size*opt.max_n, opt.nClasses)):reshape(opt.mini_batch_size, opt.max_n * opt.nClasses)
+--    print(oneProb)
+--    abort() 
     
 --    print(oneCost)
 --    abort()
@@ -105,7 +108,9 @@ function genHunData(nSamples)
       local probMat = oneProb[m]:reshape(opt.max_n, opt.nClasses)    
 
       local mar = getMarginals(probMat,solTable):reshape(1,opt.max_n*opt.max_m)
+      print(probMat)
 --      print(mar)
+--      abort()
 --      print(hunSols)
       hunSols = hunSols:cat(mar  ,1)    
     end
@@ -117,44 +122,130 @@ function genHunData(nSamples)
 end
 
 function findFeasibleSolutions(N,M)
+-- a naive nested loop implementation
+  local feasSol = {}
+  if N<=1 then error('N<=1 ?')
+  elseif N==2 then
+
+    for p1=1,M do  
+      for p2=1,M do  if p2~=p1 then
+        local ass=torch.zeros(N,M)
+        ass[1][p1]=1
+        ass[2][p2]=1
+        table.insert(feasSol, ass)
+      end end
+    end
+  elseif N==3 then    
+    for p1=1,M do  
+      for p2=1,M do  if p2~=p1 then
+        for p3=1,M do if p3~=p1 and p3~=p2 then
+          local ass=torch.zeros(N,M)
+          ass[1][p1]=1
+          ass[2][p2]=1
+          ass[3][p3]=1
+          table.insert(feasSol, ass)
+        end end
+      end end
+    end
+  elseif N==4 then    
+    for p1=1,M do  
+      for p2=1,M do  if p2~=p1 then
+        for p3=1,M do if p3~=p1 and p3~=p2 then
+          for p4=1,M do if p4~=p1 and p4~=p2 and p4~=p3 then
+            local ass=torch.zeros(N,M)
+            ass[1][p1]=1
+            ass[2][p2]=1
+            ass[3][p3]=1
+            ass[4][p4]=1
+            table.insert(feasSol, ass)
+          end end
+        end end
+      end end
+    end
+  elseif N==5 then    
+    for p1=1,M do  
+      for p2=1,M do  if p2~=p1 then
+        for p3=1,M do if p3~=p1 and p3~=p2 then
+          for p4=1,M do if p4~=p1 and p4~=p2 and p4~=p3 then
+            for p5=1,M do if p5~=p1 and p5~=p2 and p5~=p3 and p5~=p4 then
+              local ass=torch.zeros(N,M)
+              ass[1][p1]=1
+              ass[2][p2]=1
+              ass[3][p3]=1
+              ass[4][p4]=1
+              ass[5][p5]=1
+              table.insert(feasSol, ass)
+            end end
+          end end
+        end end
+      end end
+    end
+  elseif N==6 then    
+    for p1=1,M do  
+      for p2=1,M do  if p2~=p1 then
+        for p3=1,M do if p3~=p1 and p3~=p2 then
+          for p4=1,M do if p4~=p1 and p4~=p2 and p4~=p3 then
+            for p5=1,M do if p5~=p1 and p5~=p2 and p5~=p3 and p5~=p4 then
+              for p6=1,M do if p6~=p1 and p6~=p2 and p6~=p3 and p6~=p4 and p6~= p5 then
+                local ass=torch.zeros(N,M)
+                ass[1][p1]=1
+                ass[2][p2]=1
+                ass[3][p3]=1
+                ass[4][p4]=1
+                ass[5][p5]=1
+                ass[6][p6]=1
+                table.insert(feasSol, ass)
+              end end
+            end end
+          end end
+        end end
+      end end
+    end    
+    
+  else
+    error('findFeasibleSolutions not implemented for large N')
+  end  
+  
+  solTable = {}
+  solTable.feasSol = feasSol
+  solTable.infSol = infSol  
+  return solTable
+
+end
+
+function findFeasibleSolutions2(N,M)
 --  local assFile = 'tmp/ass_n'..N..'_m'..M..'.t7'
 
+  pm('Generating feasible solutions table...')
   local feasSol, infSol = {}, {}
   local possibleAssignments = math.pow(2,N*M)
 
   for s=1,possibleAssignments do
+  
     local binCode = torch.Tensor(toBits(s, N*M))
     local ass = binCode:reshape(N,M)
     local feasible = true
-    local sumAllEntries = torch.sum(binCode)
-    local sumOverColumns = torch.sum(ass,2) -- ==
-    local sumOverRows = torch.sum(ass,1) -- ==
---    local sumOverRows = torch.sum(ass:narrow(2,1,N),1) -- <=  (this is for missed det case)
-    local allOnes = torch.ones(N, 1)
+    local sumAllEntries = torch.sum(binCode)    
+    if sumAllEntries ~= N then goto continue end
     
-  --   print(ass)
-    if sumAllEntries ~= N then
-      feasible = false --     print('incorrect sum of assignments maxTar assigments '..sumAllEntries)
-    elseif torch.sum(sumOverColumns:ne(1)) > 0 then
-      feasible = false --     print('incorrect column sum '..torch.sum(sumOverColumns:ne(1)))
-    elseif torch.sum(sumOverRows:ne(1)) > 0 then
-      feasible = false  --     print('incorrect row sum '..torch.sum(sumOverRows:gt(1)))
-    end
+    local sumOverColumns = torch.sum(ass,2)    
+    if torch.sum(sumOverColumns:ne(1)) > 0 then goto continue end
     
-  --   print(feasible)
-    if feasible then
-      table.insert(feasSol, ass)
---      print(ass)      
-    else    
-      table.insert(infSol, ass)
-    end
+    local sumOverRows = torch.sum(ass,1)
+    if torch.sum(sumOverRows:ne(1)) > 0 then goto continue end
     
+    
+    table.insert(feasSol, ass)
+    
+--    print(s)
+    ::continue::
   end
     solTable = {}
     solTable.feasSol = feasSol
     solTable.infSol = infSol
 --      torch.save(assFile, solTable)
 
+  pm('... done')
   return solTable
   
 end
@@ -233,7 +324,6 @@ function printDebugValues(P, PredP)
 
   print(string.format('%5s%5s%5s%5s%5s%5s|%s|%s|%s','i','NN','HA','Mar','PMar','Err',
         getDebugTableTitle('Prob'),getDebugTableTitle('Marg'),getDebugTableTitle('Predicted Marg')))
-  local c = sys.COLORS  
   for i=1,N do
     local prLine = ''
     prLine = prLine .. string.format('%5d%5d%5d%5d%5d%5d|',i,mini[i],HunAss[i][2],mmaxi[i],pmmaxi[i],mmaxi[i]-pmmaxi[i]) 
