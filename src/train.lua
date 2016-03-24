@@ -193,8 +193,8 @@ solTable =  findFeasibleSolutions(opt.max_n, opt.max_m) -- get feasible solution
 --abort()
 TrProbTab,TrSolTab = genHunData(opt.synth_training)
 ValProbTab,ValSolTab = genHunData(opt.synth_valid)
-print(TrProbTab[1])
-abort()
+--print(TrProbTab[1])
+--abort()
 
 --abort()
 --- gen for marginals

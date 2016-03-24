@@ -92,10 +92,7 @@ function genHunData(nSamples)
     --    print(oneCost)
     --    abort()
 
-    print(oneProb)
     oneProb = dataToGPU(oneProb)
-    print(oneProb)
-    abort()
     table.insert(ProbTab, oneProb)
 
     --    local hunSols = torch.ones(1,opt.max_n):int()
@@ -110,12 +107,13 @@ function genHunData(nSamples)
     for m=1,opt.mini_batch_size do
       local probMat = oneProb[m]:reshape(opt.max_n, opt.nClasses)
 
-      local mar = getMarginals(probMat,solTable):reshape(1,opt.max_n*opt.max_m)
+      local mar = getMarginals(probMat:float(),solTable):reshape(1,opt.max_n*opt.max_m):float()
       --      print(hunSols)
       hunSols = hunSols:cat(mar  ,1)
     end
     hunSols=hunSols:sub(2,-1)
 
+    hunSols = dataToGPU(hunSols)
     table.insert(HunTab, hunSols)
   end
   return ProbTab, HunTab
