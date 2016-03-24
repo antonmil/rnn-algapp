@@ -79,6 +79,8 @@ cmd:text()
 opt = cmd:parse(arg)
 if string.len(opt.config) > 0 then opt = parseConfig(opt.config, opt) end
 
+checkCuda()       -- check for cuda availability
+
 -- create auxiliary directories (or make sure they exist)
 createAuxDirs()
 
@@ -191,6 +193,8 @@ solTable =  findFeasibleSolutions(opt.max_n, opt.max_m) -- get feasible solution
 --abort()
 TrProbTab,TrSolTab = genHunData(opt.synth_training)
 ValProbTab,ValSolTab = genHunData(opt.synth_valid)
+print(TrProbTab[1])
+abort()
 
 --abort()
 --- gen for marginals
@@ -240,7 +244,7 @@ function eval_val()
     ----- FORWARD ----   
     local initStateGlobal = clone_list(init_state)  
     local rnn_state = {[0] = initStateGlobal}
-    --   local predictions = {[0] = {[opt.statePredIndex] = detections[{{},{t}}]}}
+    --   local predictions = {[0] = {[opt.updIndex] = detections[{{},{t}}]}}
     local predictions = {}
     --     local loss = 0
     local DA = {}
@@ -317,7 +321,7 @@ function feval()
   ----- FORWARD ----   
   local initStateGlobal = clone_list(init_state)  
   local rnn_state = {[0] = initStateGlobal}
-  --   local predictions = {[0] = {[opt.statePredIndex] = detections[{{},{t}}]}}
+  --   local predictions = {[0] = {[opt.updIndex] = detections[{{},{t}}]}}
   local predictions = {}
   local loss = 0
   local DA = {}

@@ -2249,6 +2249,8 @@ function getMarginals(P, solTable)
   local N,M = getDataSize(P)
   local C = probToCost(P)
   local marginals = torch.zeros(N,M):float()
+--  print(P)
+--  print(C)
 
   
   for key, var in pairs(solTable.feasSol) do
@@ -2257,9 +2259,13 @@ function getMarginals(P, solTable)
   	marginals[idx] = marginals[idx] + torch.exp(-hypCost)   -- add to joint matrix
   end
 
-
---  marginals = makeProb(marginals) -- make probability
-  marginals = costToProb(C) 
+  
+  marginals = makeProb(marginals) -- make probability
+--  marginals = costToProb(marginals)
+  
+--  print(marginals)
+  
+--  abort() 
 
   marginals = dataToGPU(marginals)
   return marginals

@@ -1,0 +1,10 @@
+syntax: glob
+bin/*
+dump/*
+docs/*
+out/*
+tmp/*
+data/*
+config/*
+nngraph_*
+
