@@ -539,11 +539,11 @@ for i = 1, opt.max_epochs do
 
     -- plot      
     local lossPlotTab = {}
-    table.insert(lossPlotTab, {"Trng loss",plot_loss_x,plot_loss, 'linespoints lt 1'})
-    table.insert(lossPlotTab, {"Vald loss",plot_val_loss_x, plot_val_loss, 'linespoints lt 3'})
+    table.insert(lossPlotTab, {"Trng loss",plot_loss_x,plot_loss, 'with linespoints lt 1'})
+    table.insert(lossPlotTab, {"Vald loss",plot_val_loss_x, plot_val_loss, 'with linespoints lt 3'})
     --       table.insert(lossPlotTab, {"Real loss",plot_real_loss_x, plot_real_loss, 'linespoints lt 5'})
-    table.insert(lossPlotTab, {"Trng MM",plot_train_mm_x, plot_train_mm, 'points lt 1'})
-    table.insert(lossPlotTab, {"Vald MM",plot_val_mm_x, plot_val_mm, 'points lt 3'})
+    table.insert(lossPlotTab, {"Trng MM",plot_train_mm_x, plot_train_mm, 'with points lt 1'})
+    table.insert(lossPlotTab, {"Vald MM",plot_val_mm_x, plot_val_mm, 'with points lt 3'})
     --       table.insert(lossPlotTab, {"Real MM",plot_real_mm_x, plot_real_mm, 'points lt 5'})
 
     --       table.insert(lossPlotTab, {"Trng MA",plot_train_ma_x, plot_train_ma, 'points pt 1'})

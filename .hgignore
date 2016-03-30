@@ -1,4 +1,5 @@
 syntax: glob
+data/*
 bin/*
 dump/*
 docs/*

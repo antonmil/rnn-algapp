@@ -2232,12 +2232,7 @@ function mkdirP(dir)
 end
 
 
-function createAuxDirs()
-  mkdirP('./bin')
-  mkdirP('./tmp')
-  mkdirP('./out')
-  mkdirP('./config')
-end
+
 
 
 --------------------------------------------------------------------------

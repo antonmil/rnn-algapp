@@ -216,7 +216,7 @@ function getTrackPlotTab(tracks, plotTab, ptype, xvalues, ex, tshift, DA, predSt
       if ptype == 2 then lw = 2 end
       
       trname = string.format("%s %d",typestr, id)
-      ls = string.format("lines lw %d linetype %d linecolor rgbcolor %s",lw,linetype,getColorFromID(id))
+      ls = string.format("with lines lw %d linetype %d linecolor rgbcolor %s",lw,linetype,getColorFromID(id))
       if xvalues then
 	table.insert(plotTab, {trname,xvalues,(tracks[{{id},{}}]):t(),ls}) -- t() for vertical vec.
       else
@@ -235,7 +235,7 @@ function getTrackPlotTab(tracks, plotTab, ptype, xvalues, ex, tshift, DA, predSt
 	  if insertY:nElement()>1 then
 	    
 	    table.insert(plotTab, {trname, insertX, insertY, ls}) -- track thick lines	    
-	    ls = string.format("points pt 1 linecolor rgbcolor %s",getColorFromID(id))
+	    ls = string.format("with points pt 1 linecolor rgbcolor %s",getColorFromID(id))
 -- 	    table.insert(plotTab, {trname, insertX, insertY, ls}) -- pluses for track state
 	  end
 	elseif ex == nil and DA ~= nil then
@@ -256,7 +256,7 @@ function getTrackPlotTab(tracks, plotTab, ptype, xvalues, ex, tshift, DA, predSt
 	    loctrackY[t] = torch.Tensor({tracks[sid][t]})
 
 -- 	    table.insert(plotTab, {trname, t+tshift, insertY, ls})
-	    ls = string.format("points pt 2 ps 1 linecolor rgbcolor %s",getColorFromID(sid))
+	    ls = string.format("with points pt 2 ps 1 linecolor rgbcolor %s",getColorFromID(sid))
 	    table.insert(plotTab, {insertX, insertY, ls})
 	    
 	  end
@@ -264,7 +264,7 @@ function getTrackPlotTab(tracks, plotTab, ptype, xvalues, ex, tshift, DA, predSt
 	  local loctrackY = otracks[{{id},{1,-1}}]:reshape(F)	
 
 	  trname = string.format("track %d", id)	  
-	  ls = string.format("lines lw %d linetype %d linecolor rgbcolor %s",lw,linetype,getColorFromID(id))
+	  ls = string.format("with lines lw %d linetype %d linecolor rgbcolor %s",lw,linetype,getColorFromID(id))
 	  table.insert(plotTab, {trname, loctrackX, loctrackY, ls})
 	  
 	elseif ex ~= nil and DA ~= nil then
@@ -278,7 +278,7 @@ function getTrackPlotTab(tracks, plotTab, ptype, xvalues, ex, tshift, DA, predSt
 	  if insertY:nElement()>1 then
 	    
 	    table.insert(plotTab, {trname, insertX, insertY, ls})
-	    ls = string.format("points pt 1 linecolor rgbcolor %s",getColorFromID(id))
+	    ls = string.format("with points pt 1 linecolor rgbcolor %s",getColorFromID(id))
 	    table.insert(plotTab, {trname, insertX, insertY, ls})
 	  end
 	  
@@ -354,15 +354,15 @@ function getDetectionsPlotTab(detections, plotTab, thr, da,tshift,vdet)
 	  end
 	end
 	legName =  string.format("Det %d",i)
-	ls = string.format("points pt 7 ps 1 linecolor rgbcolor %s",getColorFromID(i)) -- detection dots
+	ls = string.format("with points pt 7 ps 1 linecolor rgbcolor %s",getColorFromID(i)) -- detection dots
 	if vdet then
 	  legName =  string.format("VDet %d",i)
-	  ls = string.format("points pt 6 ps .75 linecolor rgbcolor %s",getColorFromID(i)) -- virtual detection O's
+	  ls = string.format("with points pt 6 ps .75 linecolor rgbcolor %s",getColorFromID(i)) -- virtual detection O's
 	end
 -- 	if i==-1 or i == Ndet then
 	if i<=0 then
 	  legName =  string.format("FA Det")
-	  ls = string.format("points pt 6 ps 0.5 linecolor rgbcolor %s",getColorFromID(14))
+	  ls = string.format("with points pt 6 ps 0.5 linecolor rgbcolor %s",getColorFromID(14))
 	end
 	table.insert(plotTab, {legName, times, locs, ls})
       end -- if N>0
@@ -371,7 +371,7 @@ function getDetectionsPlotTab(detections, plotTab, thr, da,tshift,vdet)
     
   else	-- otherwise all in one vec
     local detT,detX = getDetectionsVec(detections, thr)
-    ls = string.format("points pt 7 ps 0.25 linecolor rgbcolor %s",getColorFromID(14))
+    ls = string.format("with points pt 7 ps 0.25 linecolor rgbcolor %s",getColorFromID(14))
     table.insert(plotTab, {"Det",detT+tshift,detX,ls})
   end
   
@@ -431,9 +431,9 @@ function getDAPlotTab(tracks, detections, plotTab, da, predEx, tshift, predDA)
 	if d~=0 then
 	  local DAprob = torch.exp(predDA[i][t][detIDToUpdate])
 -- 	  DAprob = 1
--- 	  ls = string.format("lines lw %d linetype %d linecolor rgbcolor %s",1,1,getColorFromID(i))
+-- 	  ls = string.format("with lines lw %d linetype %d linecolor rgbcolor %s",1,1,getColorFromID(i))
 	  gnuplot.raw("set palette defined (0 'white', 1 'black')")
-	  ls = string.format("lines lw %f linetype %d linecolor palette frac %f",3*DAprob,1,DAprob)
+	  ls = string.format("with lines lw %f linetype %d linecolor palette frac %f",3*DAprob,1,DAprob)
 -- 	  gnuplot.raw("set palette rgbformulae 21,22,23")
 -- 	  gnuplot.raw("unset colorbox")
 	  
@@ -444,7 +444,7 @@ function getDAPlotTab(tracks, detections, plotTab, da, predEx, tshift, predDA)
 	local assY = torch.Tensor({d})
 	local assX = torch.Tensor({detX})
 	if d == 0 then pttype = 6; psize=2; assY = torch.Tensor({x}) end	
-	ls = string.format("points pt %d ps %d linetype %d linecolor rgbcolor %s",pttype,psize,1,getColorFromID(i))
+	ls = string.format("with points pt %d ps %d linetype %d linecolor rgbcolor %s",pttype,psize,1,getColorFromID(i))
 	table.insert(plotTab, {assX, assY,ls})     -- X's
       elseif detIDToUpdate > detections:size(1) then
 	if exlabels~= nil and exlabels[i][t+1]~=0 then
@@ -456,7 +456,7 @@ function getDAPlotTab(tracks, detections, plotTab, da, predEx, tshift, predDA)
 	local assY = torch.Tensor({GTSTATE[i][t+1][dim]})
 -- 	print(assX, assY)
 -- 	sleep(1)
-	ls = string.format("points pt %d ps %d linetype %d linecolor rgbcolor %s",pttype,psize,1,getColorFromID(i))
+	ls = string.format("with points pt %d ps %d linetype %d linecolor rgbcolor %s",pttype,psize,1,getColorFromID(i))
 	table.insert(plotTab, {assX, assY,ls})     -- O's
 	end
       end
@@ -475,7 +475,7 @@ function getDAPlotTab(tracks, detections, plotTab, da, predEx, tshift, predDA)
       if labels[i][t] <= detections:size(1) then 
 	dY = torch.Tensor({detections[labels[i][t]][t]}) 
       
-	ls = string.format("points pt %d ps %d linetype %d linecolor rgbcolor %s",pttype,psize,1,getColorFromID(i))
+	ls = string.format("with points pt %d ps %d linetype %d linecolor rgbcolor %s",pttype,psize,1,getColorFromID(i))
 --       print(dX, dY, ls)
 	table.insert(plotTab, {dX, dY, ls})
       end
@@ -496,7 +496,7 @@ function getExPlotTab(plotTab,predEx, tshift)
   for id=1,N do
     local probs = predEx[id]:squeeze()-0.5
     trname = string.format("Exist %d", id)
-    ls = string.format("lines lw %d linetype %d linecolor rgbcolor %s",1,3,getColorFromID(id))
+    ls = string.format("with lines lw %d linetype %d linecolor rgbcolor %s",1,3,getColorFromID(id))
     table.insert(plotTab, {trname, exFrames, probs, ls})
     
   end
@@ -517,7 +517,7 @@ end
 --   for id=1,tracks:size(1) do
 --     if torch.sum(tracks:sub(id,id))~=0 then -- only if non-zero track
 --       trname = string.format("GT %d",id)
---       ls = string.format("lines lw 1 linecolor rgbcolor %s",getColorFromID(id))
+--       ls = string.format("with lines lw 1 linecolor rgbcolor %s",getColorFromID(id))
 --       table.insert(plotTab, {trname,(tracks[{{id},{}}]):t(),ls})
 --     end
 --   end

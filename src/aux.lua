@@ -283,8 +283,9 @@ function printDebugValues(P, PredP)
   local HAcost = torch.prod(P:gather(2,HunAss:narrow(2,2,1):long():reshape(N,1)))
   local Marcost = torch.prod(P:gather(2,mmaxi:long():reshape(N,1)))
   local PMarcost = torch.prod(P:gather(2,pmmaxi:long():reshape(N,1)))
+  local MMsum = torch.sum(mmaxi-pmmaxi)
   --  print(NNcost,HAcost,Marcost,PMarcost)
-  print(string.format('%5s%5.2f%5.2f%5.2f%5.2f','Prod',NNcost,HAcost,Marcost,PMarcost))
+  print(string.format('%5s%5.2f%5.2f%5.2f%5.2f%5d','Prod',NNcost,HAcost,Marcost,PMarcost,MMsum))
   --  print(C)
   --  print(mini)
   --  print(C:index(1,mini))
@@ -299,4 +300,12 @@ function printDebugValues(P, PredP)
   --  print(mmaxi)
 
 
+end
+
+function createAuxDirs()
+  mkdirP('./data')
+  mkdirP('./bin')
+  mkdirP('./tmp')
+  mkdirP('./out')
+  mkdirP('./config')
 end
