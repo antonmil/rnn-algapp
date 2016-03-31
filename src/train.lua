@@ -7,6 +7,7 @@ require 'optim'
 require 'gnuplot'
 require 'lfs'
 require 'image'
+require 'mattorch'
 
 local model_utils = require 'util.model'    -- model specific utils
 require 'util.misc'   -- all the rest
@@ -21,6 +22,8 @@ torch.manualSeed(1)
 
 -- for graph debugging
 nngraph.setDebug(true)
+
+torch.setdefaulttensortype('torch.FloatTensor')
 
 
 
@@ -92,6 +95,11 @@ if opt.model=='gru' then opt.model_index=2; end
 if opt.model=='rnn' then opt.model_index=3; end 
 opt.nClasses = opt.max_m
 
+opt.inSize = opt.max_n * opt.nClasses -- input feature vector size (Linear Assignment)
+--opt.inSize = opt.max_n*opt.max_m * opt.max_n*opt.max_m -- QBP 
+
+--opt.outSize = opt.nClasses
+
 -- number of hidden inputs (1 for RNN, 2 for LSTM)
 opt.nHiddenInputs = 1
 if opt.model=='lstm' then opt.nHiddenInputs = 2 end
@@ -128,8 +136,8 @@ protos.criterion:add(kl, opt.lambda)
 ------- GRAPH -----------
 if not onNetwork() then
   print('Drawing Graph')
-  graph.dot(protos.rnn.fg, 'Forw', 'RNNForwardGraph_AA')
-  graph.dot(protos.rnn.bg, 'Backw', 'RNNBackwardGraph_AA')
+  graph.dot(protos.rnn.fg, 'Forw', getRootDir()..'graph/RNNForwardGraph_AA')
+  graph.dot(protos.rnn.bg, 'Backw', getRootDir()..'graph/RNNBackwardGraph_AA')
 end
 -------------------------
 
@@ -169,51 +177,34 @@ end
 pm('   ...done',2)
 
 
---local N,M = 3,3
---local ass=torch.zeros(N*M)
---for p1=1,M do  
---  for p2=1,M do  if p2~=p1 then
---    for p3=1,M do  if p3~=p1 and p3~=p2 then
-----      print(p1,p2,p3)
---      local ass=torch.zeros(N,M)
---      ass[1][p1]=1
---      ass[2][p2]=1
---      ass[3][p3]=1
---      print(ass)
---    end end
---  end end
---end
-
-
-
-
 ----- gen data for Hungarian
 solTable =  findFeasibleSolutions(opt.max_n, opt.max_m) -- get feasible solutions
+--TrProbTab,TrSolTab = genHunData(opt.synth_training)
+--ValProbTab,ValSolTab = genHunData(opt.synth_valid)
+
 --print(solTable)
 --abort()
-TrProbTab,TrSolTab = genHunData(opt.synth_training)
-ValProbTab,ValSolTab = genHunData(opt.synth_valid)
+TrProbTab,TrSolTab = genMarginalsData(opt.synth_training)
+ValProbTab,ValSolTab = genMarginalsData(opt.synth_valid)
+
+--TrProbTab,TrSolTab,ValProbTab,ValSolTab = readQBPData(opt.synth_training)
 --print(TrProbTab[1])
---abort()
+--print(TrSolTab[1])
+--print(ValProbTab[1])
+--print(ValSolTab[1])
 
 --abort()
---- gen for marginals
---TrCostTab,TrSolTab = genMarData(opt.synth_training)
---ValCostTab,ValSolTab = genMarData(opt.synth_valid)
---print(TrCostTab[1])
---abort()
-
 
 function getGTDA(tar)
   local DA = nil
 
 
+  -- integer
 --  DA = huns[{{},{tar}}]:reshape(opt.mini_batch_size)
   
-  local offset = opt.max_n * (tar-1)+1
-  
+  -- one hot (or full prob distr.)
+  local offset = opt.max_n * (tar-1)+1  
   DA = huns[{{},{offset, offset+opt.max_n-1}}]
---  DA = torch.log(DA)
 
   return DA
 end
@@ -277,15 +268,17 @@ function eval_val()
       local predDA=costToProb(-logpredDA)
       
       local hun = huns:sub(1,1)
-      local cmtr = probs:reshape(opt.mini_batch_size*opt.max_n, opt.nClasses):sub(1,opt.max_n)
---      print(predDA)
---      print(costs)
+      print(hun)
+      local cmtr = probs:sub(1,1):reshape(opt.max_n,opt.max_m)
+      print(predDA)
+      print(cmtr)
       printDebugValues(cmtr:reshape(opt.max_n,opt.max_m), predDA:reshape(opt.max_n, opt.max_m))
-
+--
     local marginals = getMarginals(cmtr,solTable)
     local mmaxv, mmaxi = torch.max(marginals,2)
     local pmmaxv, pmmaxi = torch.max(predDA,2)
     eval_val_mm = torch.sum(torch.abs(mmaxi-pmmaxi):ne(0))
+--      eval_val_mm = 0
     
 --      eval_val_mm = getDAErrorHUN(predDA:reshape(opt.max_n,1,opt.nClasses), mmaxi:reshape(opt.max_n,1))
       --       print(eval_val_mm)
@@ -313,7 +306,7 @@ function feval()
   if seqCnt > tabLen(TrProbTab) then seqCnt = 1 end
   randSeq = seqCnt
 
-  randSeq = math.random(tL) -- pick a random sequence from training set
+--  randSeq = math.random(tL) -- pick a random sequence from training set
   probs = TrProbTab[randSeq]:clone()
   huns = TrSolTab[randSeq]:clone()
 

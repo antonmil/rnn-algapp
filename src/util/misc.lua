@@ -2269,7 +2269,8 @@ function getMarginals(P, solTable)
 end
 
 function probToCost(P)
-  return -torch.log(P)
+  local C = -torch.log(P)  
+  return C
 end
 
 function costToProb(C)  

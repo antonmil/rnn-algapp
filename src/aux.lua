@@ -26,7 +26,7 @@ function getOneCost(seed)
   --     fillMatrix = fillMatrix + torch.rand(opt.mini_batch_size*opt.max_n,opt.max_m) * opt.dummy_noise
   --   end
 
-  oneCost[{{},{opt.max_m+1,opt.nClasses}}] = getFillMatrix(true, opt.miss_thr, opt.dummy_noise, 1)
+--  oneCost[{{},{opt.max_m+1,opt.nClasses}}] = getFillMatrix(true, opt.miss_thr, opt.dummy_noise, 1)
   oneCost=oneCost:reshape(opt.mini_batch_size, opt.max_n*opt.nClasses)
 
   --   torch.manualSeed(math.random(1e10))
@@ -59,6 +59,41 @@ end
 --------------------------------------------------------------------------
 --- Generate Data for Hungarian training
 function genHunData(nSamples)
+--   if opt.permute ~= 0 then error('permutation not implemented') end
+  local CostTab, HunTab = {},{}
+  local missThr = opt.miss_thr
+  for n=1,nSamples do
+    
+    if n%math.floor(nSamples/5)==0 then 
+      print((n)*(100/(nSamples))..' %...') 
+    end
+    
+    local oneCost = getOneCost()
+    --    print(oneProb)
+    local oneProb = makeProb(oneCost:reshape(opt.mini_batch_size*opt.max_n, opt.nClasses)):reshape(opt.mini_batch_size, opt.max_n * opt.nClasses)
+    
+    
+    --     oneCost = oneCost:cat(torch.ones(miniBatchSize, maxTargets)*missThr)
+--     print(oneCost)
+--     abort()
+    oneProb = dataToGPU(oneProb)
+    table.insert(CostTab, oneProb)
+    
+    local hunSols = torch.ones(1,opt.max_n):int()
+    for m=1,opt.mini_batch_size do
+      local probMat = oneProb[m]:reshape(opt.max_n, opt.nClasses)    
+      local ass = hungarianL(-probMat)
+      hunSols = hunSols:cat(ass[{{},{2}}]:reshape(1,opt.max_n):int(), 1)    
+    end
+    hunSols=hunSols:sub(2,-1)
+    table.insert(HunTab, hunSols)    
+  end
+  return CostTab, HunTab
+end
+
+--------------------------------------------------------------------------
+--- Generate Data for marginals training
+function genMarginalsData(nSamples)
   --   if opt.permute ~= 0 then error('permutation not implemented') end
   local ProbTab, HunTab = {},{}
   local missThr = opt.miss_thr
@@ -118,6 +153,86 @@ function genHunData(nSamples)
   end
   return ProbTab, HunTab
 end
+
+
+--------------------------------------------------------------------------
+--- read QBP data and solutions
+function readQBPData()
+
+  
+  local ProbTab, SolTab = {},{}
+  local ValProbTab, ValSolTab = {},{}
+  
+  local Qfile = string.format('%sdata/c_N%d_M%d',getRootDir(), opt.max_n, opt.max_m);
+--  local Solfile = string.format('%sdata/Sol_N%d_M%d',getRootDir(), opt.max_n, opt.max_m);
+  local Solfile = string.format('%sdata/SolInt_N%d_M%d',getRootDir(), opt.max_n, opt.max_m);
+  
+  local loaded = mattorch.load(Qfile..'.mat')
+  local allQ = loaded.allc:t() -- TODO why is it transposed?
+  
+  local loaded = mattorch.load(Solfile..'.mat')
+  local allSol = loaded.allSolInt:t() -- TODO why is it transposed?
+  
+  pm('Loaded data matrix of size '..allQ:size(1) .. ' x '..allQ:size(2))
+  pm('Loaded soln matrix of size '..allSol:size(1) .. ' x '..allSol:size(2))
+  local samplesNeeded = opt.synth_training*opt.mini_batch_size + (opt.synth_valid*opt.mini_batch_size)
+  if allQ:size(1) < samplesNeeded then
+    error('not enough data...')
+  end
+  
+  allQ = dataToGPU(allQ)
+  allSol = dataToGPU(allSol)
+  
+  local nth = 0 -- counter for reading lines
+--  local solSize = opt.max_n*opt.max_m -- one hot
+  local solSize = opt.max_n -- integer
+  
+  -- training data
+  pm('training data...')
+  local nSamples = opt.synth_training   
+  for n=1,nSamples do
+    if n%math.floor(nSamples/2)==0 then print((n)*(100/(nSamples))..' %...') end
+    
+    local oneBatch = torch.zeros(1,opt.inSize)
+    local oneBatchSol = torch.zeros(1,solSize)
+    
+    for mb=1,opt.mini_batch_size do
+      nth=nth+1
+      oneBatch = oneBatch:cat(allQ[nth]:reshape(1,opt.inSize),1)
+      oneBatchSol = oneBatchSol:cat(allSol[nth]:reshape(1,solSize),1)
+--      oneBatchSol = oneBatchSol:cat(getMarginals(allQ[nth]:reshape(opt.max_n,opt.max_m):float(),solTable):reshape(1,opt.max_n*opt.max_m):float(),1)
+    end
+    oneBatch=oneBatch:sub(2,-1)
+    oneBatchSol=oneBatchSol:sub(2,-1)
+    table.insert(ProbTab, oneBatch)
+    table.insert(SolTab, oneBatchSol)
+  end  
+  
+  pm('validation data...')
+  -- validation data
+  local nSamples = opt.synth_valid   
+  for n=1,nSamples do
+    if n%math.floor(nSamples/2)==0 then print((n)*(100/(nSamples))..' %...') end
+    
+    local oneBatch = torch.zeros(1,opt.inSize)
+    local oneBatchSol = torch.zeros(1,solSize)
+    
+    for mb=1,opt.mini_batch_size do
+      nth=nth+1
+      oneBatch = oneBatch:cat(allQ[nth]:reshape(1,opt.inSize),1)
+      oneBatchSol = oneBatchSol:cat(allSol[nth]:reshape(1,solSize),1)
+--      oneBatchSol = oneBatchSol:cat(getMarginals(allQ[nth]:reshape(opt.max_n,opt.max_m):float(),solTable):reshape(1,opt.max_n*opt.max_m):float(),1)
+    end
+    oneBatch=oneBatch:sub(2,-1)
+    oneBatchSol=oneBatchSol:sub(2,-1)
+    table.insert(ValProbTab, oneBatch)
+    table.insert(ValSolTab, oneBatchSol)
+  end  
+  
+  return ProbTab, SolTab, ValProbTab, ValSolTab
+end
+
+
 
 function findFeasibleSolutions(N,M)
   -- using Penlight permute
@@ -193,7 +308,8 @@ function getRNNInput(t, rnn_state, predictions)
   local rnninp = {}
 
   -- Cost matrix
-  local loccost = probs:clone():reshape(opt.mini_batch_size, opt.max_n*opt.nClasses)
+  local loccost = probs:clone():reshape(opt.mini_batch_size, opt.inSize)
+  loccost = probToCost(loccost)
   table.insert(rnninp, loccost)
 
   for i = 1,#rnn_state[t-1] do table.insert(rnninp,rnn_state[t-1][i]) end
@@ -303,9 +419,10 @@ function printDebugValues(P, PredP)
 end
 
 function createAuxDirs()
-  mkdirP('./data')
-  mkdirP('./bin')
-  mkdirP('./tmp')
-  mkdirP('./out')
-  mkdirP('./config')
+  local rootDir = getRootDir()
+  mkdirP(rootDir..'/bin')
+  mkdirP(rootDir..'/tmp')
+  mkdirP(rootDir..'/out')
+  mkdirP(rootDir..'/config')
+  mkdirP(rootDir..'/graph')
 end

@@ -46,7 +46,7 @@
           print_every  100
        eval_val_every  1000
            plot_every  1000
-              dropout  0.03
+              dropout  0.1
              temp_win  4
            suppress_x  0
               verbose  2

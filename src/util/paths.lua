@@ -20,12 +20,18 @@ function getDataDir()
 end
 
 --------------------------------------------------------------------------
+--- Get project ROOT directory (relative)
+function getRootDir()
+  return '../' -- relative to ./src
+end
+
+--------------------------------------------------------------------------
 --- Get directory where results are stored.
 function getResDir(modelName, modelSign)
-  local outDir = 'out'..'/'
+  local outDir = getRootDir()..'out'..'/'
  
   if modelName ~= nil and modelSign ~= nil then
-    outDir = 'out'..'/'..modelName..'_'..modelSign..'/'
+    outDir = getRootDir()..'out'..'/'..modelName..'_'..modelSign..'/'
   end
   
   print('Getting results from '..outDir)
