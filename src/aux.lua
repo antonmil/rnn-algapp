@@ -163,15 +163,24 @@ function readQBPData()
   local ProbTab, SolTab = {},{}
   local ValProbTab, ValSolTab = {},{}
   
-  local Qfile = string.format('%sdata/c_N%d_M%d',getRootDir(), opt.max_n, opt.max_m);
---  local Solfile = string.format('%sdata/Sol_N%d_M%d',getRootDir(), opt.max_n, opt.max_m);
-  local Solfile = string.format('%sdata/SolInt_N%d_M%d',getRootDir(), opt.max_n, opt.max_m);
-  
+  local Qfile = string.format('%sdata/Q_N%d_M%d',getRootDir(), opt.max_n, opt.max_m);  
   local loaded = mattorch.load(Qfile..'.mat')
-  local allQ = loaded.allc:t() -- TODO why is it transposed?
+  local allQ = loaded.allQ:t() -- TODO why is it transposed?
   
-  local loaded = mattorch.load(Solfile..'.mat')
-  local allSol = loaded.allSolInt:t() -- TODO why is it transposed?
+  
+  local Solfile = string.format('%sdata/Sol_N%d_M%d',getRootDir(), opt.max_n, opt.max_m);
+  local allSol = {}
+  if opt.solution == 'integer' then    
+    Solfile = string.format('%sdata/SolInt_N%d_M%d',getRootDir(), opt.max_n, opt.max_m);
+    local loaded = mattorch.load(Solfile..'.mat')
+    allSol = loaded.allSolInt:t() -- TODO why is it transposed?
+  elseif opt.solution == 'distribution' then
+    Solfile = string.format('%sdata/Sol_N%d_M%d',getRootDir(), opt.max_n, opt.max_m);
+    local loaded = mattorch.load(Solfile..'.mat')
+    allSol = loaded.allSol:t() -- TODO why is it transposed?    
+  end
+    
+  
   
   pm('Loaded data matrix of size '..allQ:size(1) .. ' x '..allQ:size(2))
   pm('Loaded soln matrix of size '..allSol:size(1) .. ' x '..allSol:size(2))
@@ -185,7 +194,7 @@ function readQBPData()
   
   local nth = 0 -- counter for reading lines
 --  local solSize = opt.max_n*opt.max_m -- one hot
-  local solSize = opt.max_n -- integer
+--  local opt.solSize = opt.max_n -- integer
   
   -- training data
   pm('training data...')
@@ -194,12 +203,12 @@ function readQBPData()
     if n%math.floor(nSamples/2)==0 then print((n)*(100/(nSamples))..' %...') end
     
     local oneBatch = torch.zeros(1,opt.inSize)
-    local oneBatchSol = torch.zeros(1,solSize)
+    local oneBatchSol = torch.zeros(1,opt.solSize)
     
     for mb=1,opt.mini_batch_size do
       nth=nth+1
       oneBatch = oneBatch:cat(allQ[nth]:reshape(1,opt.inSize),1)
-      oneBatchSol = oneBatchSol:cat(allSol[nth]:reshape(1,solSize),1)
+      oneBatchSol = oneBatchSol:cat(allSol[nth]:reshape(1,opt.solSize),1)
 --      oneBatchSol = oneBatchSol:cat(getMarginals(allQ[nth]:reshape(opt.max_n,opt.max_m):float(),solTable):reshape(1,opt.max_n*opt.max_m):float(),1)
     end
     oneBatch=oneBatch:sub(2,-1)
@@ -215,12 +224,12 @@ function readQBPData()
     if n%math.floor(nSamples/2)==0 then print((n)*(100/(nSamples))..' %...') end
     
     local oneBatch = torch.zeros(1,opt.inSize)
-    local oneBatchSol = torch.zeros(1,solSize)
+    local oneBatchSol = torch.zeros(1,opt.solSize)
     
     for mb=1,opt.mini_batch_size do
       nth=nth+1
       oneBatch = oneBatch:cat(allQ[nth]:reshape(1,opt.inSize),1)
-      oneBatchSol = oneBatchSol:cat(allSol[nth]:reshape(1,solSize),1)
+      oneBatchSol = oneBatchSol:cat(allSol[nth]:reshape(1,opt.solSize),1)
 --      oneBatchSol = oneBatchSol:cat(getMarginals(allQ[nth]:reshape(opt.max_n,opt.max_m):float(),solTable):reshape(1,opt.max_n*opt.max_m):float(),1)
     end
     oneBatch=oneBatch:sub(2,-1)
@@ -399,7 +408,7 @@ function printDebugValues(P, PredP)
   local HAcost = torch.prod(P:gather(2,HunAss:narrow(2,2,1):long():reshape(N,1)))
   local Marcost = torch.prod(P:gather(2,mmaxi:long():reshape(N,1)))
   local PMarcost = torch.prod(P:gather(2,pmmaxi:long():reshape(N,1)))
-  local MMsum = torch.sum(mmaxi-pmmaxi)
+  local MMsum = torch.sum((mmaxi-pmmaxi):ne(0)) -- sum of wrong predictions
   --  print(NNcost,HAcost,Marcost,PMarcost)
   print(string.format('%5s%5.2f%5.2f%5.2f%5.2f%5d','Prod',NNcost,HAcost,Marcost,PMarcost,MMsum))
   --  print(C)

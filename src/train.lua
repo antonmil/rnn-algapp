@@ -41,6 +41,7 @@ cmd:option('-num_layers',1,'number of layers in the RNN / LSTM')
 cmd:option('-max_n',2,'number of rows')
 cmd:option('-max_m',2,'number of columns')
 cmd:option('-lambda',1,'loss weighting')
+cmd:option('-solution','integer','[integer|distribution]')
 -- optimization
 cmd:option('-lrng_rate',1e-2,'learning rate')
 cmd:option('-lrng_rate_decay',0.99,'learning rate decay')
@@ -96,7 +97,13 @@ if opt.model=='rnn' then opt.model_index=3; end
 opt.nClasses = opt.max_m
 
 opt.inSize = opt.max_n * opt.nClasses -- input feature vector size (Linear Assignment)
---opt.inSize = opt.max_n*opt.max_m * opt.max_n*opt.max_m -- QBP 
+opt.inSize = opt.max_n*opt.max_m * opt.max_n*opt.max_m -- QBP 
+
+opt.solSize = opt.max_n -- integer
+if opt.solution == 'distribution' then
+  opt.solSize = opt.max_n*opt.max_m -- one hot (or full)
+end
+
 
 --opt.outSize = opt.nClasses
 
@@ -130,7 +137,11 @@ local kl = nn.DistKLDivCriterion()
 local mlm = nn.MultiLabelMarginCriterion()
 local mlsm = nn.MultiLabelSoftMarginCriterion()
 protos.criterion = nn.ParallelCriterion()
-protos.criterion:add(kl, opt.lambda)
+if opt.solution == 'integer' then
+  protos.criterion:add(nllc, opt.lambda)
+elseif opt.solution == 'distribution' then
+  protos.criterion:add(kl, opt.lambda)
+end
 
 
 ------- GRAPH -----------
@@ -184,10 +195,10 @@ solTable =  findFeasibleSolutions(opt.max_n, opt.max_m) -- get feasible solution
 
 --print(solTable)
 --abort()
-TrProbTab,TrSolTab = genMarginalsData(opt.synth_training)
-ValProbTab,ValSolTab = genMarginalsData(opt.synth_valid)
+--TrProbTab,TrSolTab = genMarginalsData(opt.synth_training)
+--ValProbTab,ValSolTab = genMarginalsData(opt.synth_valid)
 
---TrProbTab,TrSolTab,ValProbTab,ValSolTab = readQBPData(opt.synth_training)
+TrProbTab,TrSolTab,ValProbTab,ValSolTab = readQBPData(opt.synth_training)
 --print(TrProbTab[1])
 --print(TrSolTab[1])
 --print(ValProbTab[1])
@@ -199,12 +210,14 @@ function getGTDA(tar)
   local DA = nil
 
 
-  -- integer
---  DA = huns[{{},{tar}}]:reshape(opt.mini_batch_size)
-  
-  -- one hot (or full prob distr.)
-  local offset = opt.max_n * (tar-1)+1  
-  DA = huns[{{},{offset, offset+opt.max_n-1}}]
+  if opt.solution == 'integer' then
+    -- integer
+    DA = huns[{{},{tar}}]:reshape(opt.mini_batch_size)
+  elseif opt.solution == 'distribution' then
+    -- one hot (or full prob distr.)
+    local offset = opt.max_n * (tar-1)+1  
+    DA = huns[{{},{offset, offset+opt.max_n-1}}]
+  end
 
   return DA
 end
@@ -268,17 +281,28 @@ function eval_val()
       local predDA=costToProb(-logpredDA)
       
       local hun = huns:sub(1,1)
-      print(hun)
-      local cmtr = probs:sub(1,1):reshape(opt.max_n,opt.max_m)
-      print(predDA)
-      print(cmtr)
-      printDebugValues(cmtr:reshape(opt.max_n,opt.max_m), predDA:reshape(opt.max_n, opt.max_m))
---
-    local marginals = getMarginals(cmtr,solTable)
-    local mmaxv, mmaxi = torch.max(marginals,2)
+--      print(hun)
+--      local cmtr = probs:sub(1,1):reshape(opt.max_n,opt.max_m)
+--      print(predDA)
+--      print(cmtr)
+--      printDebugValues(cmtr:reshape(opt.max_n,opt.max_m), predDA:reshape(opt.max_n, opt.max_m))
+----
+    eval_val_mm = 0
     local pmmaxv, pmmaxi = torch.max(predDA,2)
-    eval_val_mm = torch.sum(torch.abs(mmaxi-pmmaxi):ne(0))
---      eval_val_mm = 0
+    -- marginals   
+--    local marginals = getMarginals(cmtr,solTable)
+--    local mmaxv, mmaxi = torch.max(marginals,2)    
+--    eval_val_mm = torch.sum(torch.abs(mmaxi-pmmaxi):ne(0))
+    
+    -- greedy
+    local sol = hun
+    if opt.solution == 'distribution' then
+      local sv, si = torch.max(hun:reshape(opt.max_n, opt.max_m),2)
+      sol = si:clone()
+    end
+
+    eval_val_mm = torch.sum(torch.abs(sol-pmmaxi):ne(0))
+      
     
 --      eval_val_mm = getDAErrorHUN(predDA:reshape(opt.max_n,1,opt.nClasses), mmaxi:reshape(opt.max_n,1))
       --       print(eval_val_mm)
@@ -330,6 +354,7 @@ function feval()
 --         print(lst)
 --         abort()
 
+--    print(rnninp[1])
     rnn_state[t] = {}
     for i=1,#init_state do table.insert(rnn_state[t], lst[i]) end -- extract the state, without output
     DA[t] = decode(predictions, t)

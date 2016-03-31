@@ -1,26 +1,21 @@
           model_index  1
              rnn_size  100
            num_layers  1
-                max_n  3
-                max_m  3
+                max_n  2
+                max_m  2
+             solution  distribution
             state_dim  4
            batch_size  1
             loss_type  1
                   vel  0
               fixed_n  1
                lambda  1
-                  bce  0
-             pwd_mode  0
-                 linp  0
-                 einp  0
-               dalink  1
-              detlink  1              
                
             init_from  
         training_file  
            max_epochs  20000
       mini_batch_size  10
-       synth_training  100
+       synth_training  200
           synth_valid  10
              full_set  0
 

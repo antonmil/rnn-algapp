@@ -8,4 +8,6 @@ tmp/*
 data/*
 config/*
 nngraph_*
+*.dot
+*.svg
 
