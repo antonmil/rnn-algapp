@@ -41,6 +41,8 @@ cmd:option('-num_layers',1,'number of layers in the RNN / LSTM')
 cmd:option('-max_n',2,'number of rows')
 cmd:option('-max_m',2,'number of columns')
 cmd:option('-lambda',1,'loss weighting')
+cmd:option('-problem','quadratic','[linear|quadratic]')
+cmd:option('-inference','MAP','[MAP|marginal]')
 cmd:option('-solution','integer','[integer|distribution]')
 -- optimization
 cmd:option('-lrng_rate',1e-2,'learning rate')
@@ -97,7 +99,9 @@ if opt.model=='rnn' then opt.model_index=3; end
 opt.nClasses = opt.max_m
 
 opt.inSize = opt.max_n * opt.nClasses -- input feature vector size (Linear Assignment)
-opt.inSize = opt.max_n*opt.max_m * opt.max_n*opt.max_m -- QBP 
+if opt.problem=='quadratic' then
+  opt.inSize = opt.max_n*opt.max_m * opt.max_n*opt.max_m -- QBP
+end
 
 opt.solSize = opt.max_n -- integer
 if opt.solution == 'distribution' then
@@ -190,15 +194,15 @@ pm('   ...done',2)
 
 ----- gen data for Hungarian
 solTable =  findFeasibleSolutions(opt.max_n, opt.max_m) -- get feasible solutions
---TrProbTab,TrSolTab = genHunData(opt.synth_training)
---ValProbTab,ValSolTab = genHunData(opt.synth_valid)
+TrCostTab,TrSolTab = genHunData(opt.synth_training)
+ValCostTab,ValSolTab = genHunData(opt.synth_valid)
 
 --print(solTable)
 --abort()
---TrProbTab,TrSolTab = genMarginalsData(opt.synth_training)
---ValProbTab,ValSolTab = genMarginalsData(opt.synth_valid)
+--TrCostTab,TrSolTab = genMarginalsData(opt.synth_training)
+--ValCostTab,ValSolTab = genMarginalsData(opt.synth_valid)
 
-TrProbTab,TrSolTab,ValProbTab,ValSolTab = readQBPData(opt.synth_training)
+--TrCostTab,TrSolTab,ValCostTab,ValSolTab = readQBPData('train')
 --print(TrProbTab[1])
 --print(TrSolTab[1])
 --print(ValProbTab[1])
@@ -223,7 +227,7 @@ function getGTDA(tar)
 end
 
 
-function getPredAndGTTables(predDA, tar)      
+function getPredAndGTTables(predDA, tar)
   local input, output = {}, {}
 
   local GTDA = getGTDA(tar)
@@ -236,12 +240,12 @@ end
 
 function eval_val()  
 
-  local tL = tabLen(ValProbTab)
+  local tL = tabLen(ValCostTab)
   local loss = 0
   local T = opt.max_n
   local plotSeq = math.random(tL)
   for seq=1,tL do
-    probs = ValProbTab[seq]:clone()
+    costs = ValCostTab[seq]:clone()
     huns = ValSolTab[seq]:clone()
 
     TRAINING = false
@@ -295,13 +299,13 @@ function eval_val()
 --    eval_val_mm = torch.sum(torch.abs(mmaxi-pmmaxi):ne(0))
     
     -- greedy
-    local sol = hun
+    local sol = hun:reshape(opt.max_n,1)
     if opt.solution == 'distribution' then
       local sv, si = torch.max(hun:reshape(opt.max_n, opt.max_m),2)
       sol = si:clone()
     end
 
-    eval_val_mm = torch.sum(torch.abs(sol-pmmaxi):ne(0))
+    eval_val_mm = torch.sum(torch.abs(sol:float()-pmmaxi:float()):ne(0))
       
     
 --      eval_val_mm = getDAErrorHUN(predDA:reshape(opt.max_n,1,opt.nClasses), mmaxi:reshape(opt.max_n,1))
@@ -324,14 +328,14 @@ seqCnt=0
 function feval()  
   grad_params:zero()
 
-  local tL = tabLen(TrProbTab)
+  local tL = tabLen(TrCostTab)
 
   seqCnt=seqCnt+1
-  if seqCnt > tabLen(TrProbTab) then seqCnt = 1 end
+  if seqCnt > tabLen(TrCostTab) then seqCnt = 1 end
   randSeq = seqCnt
 
 --  randSeq = math.random(tL) -- pick a random sequence from training set
-  probs = TrProbTab[randSeq]:clone()
+  costs = TrCostTab[randSeq]:clone()
   huns = TrSolTab[randSeq]:clone()
 
   TRAINING = true
@@ -567,18 +571,6 @@ for i = 1, opt.max_epochs do
     --       table.insert(lossPlotTab, {"Trng MA",plot_train_ma_x, plot_train_ma, 'points pt 1'})
     --       table.insert(lossPlotTab, {"Vald MA",plot_val_ma_x, plot_val_ma, 'points pt 3'})
 
-    savefile = string.format('bin/LSTM-DA.t7')
-    print('saving plot numbers ' .. savefile)
-    local plot_stats = {}
-    plot_stats.plot_loss_x = plot_loss_x
-    plot_stats.plot_val_loss_x = plot_val_loss_x
-    plot_stats.plot_train_mm_x = plot_train_mm_x
-    plot_stats.plot_val_mm_x = plot_val_mm_x      
-    plot_stats.plot_loss = plot_loss
-    plot_stats.plot_val_loss = plot_val_loss
-    plot_stats.plot_train_mm = plot_train_mm
-    plot_stats.plot_val_mm = plot_val_mm    
-    torch.save(savefile, plot_stats)
 
     --  local minInd = math.min(1,plot_loss:nElement())
     local maxY = math.max(torch.max(plot_loss), torch.max(plot_val_loss), torch.max(plot_real_loss), 

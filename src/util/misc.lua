@@ -167,13 +167,13 @@ function getData(fileName, mode)
   
   -- go through all lines
   for l = 1,tabLen(raw) do    
-    fr=raw[l][1]
-    id=raw[l][2]
-    bx=raw[l][3]
-    by=raw[l][4]
-    bw=raw[l][5]
-    bh=raw[l][6]
-    sc=raw[l][7]
+    local fr=raw[l][1]
+    local id=raw[l][2]
+    local bx=raw[l][3]
+    local by=raw[l][4]
+    local bw=raw[l][5]
+    local bh=raw[l][6]
+    local sc=raw[l][7]
     if data[fr] == nil then
       data[fr] = {}      
     end
@@ -2237,12 +2237,12 @@ end
 
 --------------------------------------------------------------------------
 --- Compute marginal assignment distributions 
--- @param P     The probability matrix
+-- @param C     The cost matrix
 -- @param solTable  A table containing all feasible assignments
-function getMarginals(P, solTable)
+function getMarginals(C, solTable)
  
-  local N,M = getDataSize(P)
-  local C = probToCost(P)
+  local N,M = getDataSize(C)
+--  local C = probToCost(P)
   local marginals = torch.zeros(N,M):float()
 --  print(P)
 --  print(C)

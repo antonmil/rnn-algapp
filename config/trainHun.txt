@@ -1,9 +1,11 @@
           model_index  1
              rnn_size  100
            num_layers  1
-                max_n  2
-                max_m  2
-             solution  distribution
+                max_n  3
+                max_m  3
+              problem  linear
+            inference  MAP
+             solution  integer
             state_dim  4
            batch_size  1
             loss_type  1
@@ -15,7 +17,7 @@
         training_file  
            max_epochs  20000
       mini_batch_size  10
-       synth_training  200
+       synth_training  1800
           synth_valid  10
              full_set  0
 

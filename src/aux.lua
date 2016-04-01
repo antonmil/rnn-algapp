@@ -26,7 +26,7 @@ function getOneCost(seed)
   --     fillMatrix = fillMatrix + torch.rand(opt.mini_batch_size*opt.max_n,opt.max_m) * opt.dummy_noise
   --   end
 
---  oneCost[{{},{opt.max_m+1,opt.nClasses}}] = getFillMatrix(true, opt.miss_thr, opt.dummy_noise, 1)
+  --  oneCost[{{},{opt.max_m+1,opt.nClasses}}] = getFillMatrix(true, opt.miss_thr, opt.dummy_noise, 1)
   oneCost=oneCost:reshape(opt.mini_batch_size, opt.max_n*opt.nClasses)
 
   --   torch.manualSeed(math.random(1e10))
@@ -59,34 +59,34 @@ end
 --------------------------------------------------------------------------
 --- Generate Data for Hungarian training
 function genHunData(nSamples)
---   if opt.permute ~= 0 then error('permutation not implemented') end
+  --   if opt.permute ~= 0 then error('permutation not implemented') end
   local CostTab, HunTab = {},{}
   local missThr = opt.miss_thr
   for n=1,nSamples do
-    
-    if n%math.floor(nSamples/5)==0 then 
-      print((n)*(100/(nSamples))..' %...') 
+
+    if n%math.floor(nSamples/5)==0 then
+      print((n)*(100/(nSamples))..' %...')
     end
-    
+
     local oneCost = getOneCost()
     --    print(oneProb)
-    local oneProb = makeProb(oneCost:reshape(opt.mini_batch_size*opt.max_n, opt.nClasses)):reshape(opt.mini_batch_size, opt.max_n * opt.nClasses)
-    
-    
+--    local oneProb = makeProb(oneCost:reshape(opt.mini_batch_size*opt.max_n, opt.nClasses)):reshape(opt.mini_batch_size, opt.max_n * opt.nClasses)
+
+
     --     oneCost = oneCost:cat(torch.ones(miniBatchSize, maxTargets)*missThr)
---     print(oneCost)
---     abort()
-    oneProb = dataToGPU(oneProb)
-    table.insert(CostTab, oneProb)
-    
+    --     print(oneCost)
+    --     abort()
+    oneCost = dataToGPU(oneCost)
+    table.insert(CostTab, oneCost)
+
     local hunSols = torch.ones(1,opt.max_n):int()
     for m=1,opt.mini_batch_size do
-      local probMat = oneProb[m]:reshape(opt.max_n, opt.nClasses)    
-      local ass = hungarianL(-probMat)
-      hunSols = hunSols:cat(ass[{{},{2}}]:reshape(1,opt.max_n):int(), 1)    
+      local costMat = oneCost[m]:reshape(opt.max_n, opt.nClasses)
+      local ass = hungarianL(costMat)
+      hunSols = hunSols:cat(ass[{{},{2}}]:reshape(1,opt.max_n):int(), 1)
     end
     hunSols=hunSols:sub(2,-1)
-    table.insert(HunTab, hunSols)    
+    table.insert(HunTab, hunSols)
   end
   return CostTab, HunTab
 end
@@ -157,87 +157,88 @@ end
 
 --------------------------------------------------------------------------
 --- read QBP data and solutions
-function readQBPData()
+function readQBPData(ttmode)
 
-  
+  if ttmode ==nil or (ttmode~='train' and ttmode~='test') then ttmode = 'train' end
+
   local ProbTab, SolTab = {},{}
   local ValProbTab, ValSolTab = {},{}
-  
-  local Qfile = string.format('%sdata/Q_N%d_M%d',getRootDir(), opt.max_n, opt.max_m);  
+
+  local Qfile = string.format('%sdata/%s/Q_N%d_M%d',getRootDir(), ttmode, opt.max_n, opt.max_m);
   local loaded = mattorch.load(Qfile..'.mat')
   local allQ = loaded.allQ:t() -- TODO why is it transposed?
-  
-  
-  local Solfile = string.format('%sdata/Sol_N%d_M%d',getRootDir(), opt.max_n, opt.max_m);
+
+
+  local Solfile = string.format('%sdata/%s/Sol_N%d_M%d',getRootDir(), ttmode, opt.max_n, opt.max_m);
   local allSol = {}
-  if opt.solution == 'integer' then    
-    Solfile = string.format('%sdata/SolInt_N%d_M%d',getRootDir(), opt.max_n, opt.max_m);
+  if opt.solution == 'integer' then
+    Solfile = string.format('%sdata/%s/SolInt_N%d_M%d',getRootDir(), ttmode, opt.max_n, opt.max_m);
     local loaded = mattorch.load(Solfile..'.mat')
     allSol = loaded.allSolInt:t() -- TODO why is it transposed?
   elseif opt.solution == 'distribution' then
-    Solfile = string.format('%sdata/Sol_N%d_M%d',getRootDir(), opt.max_n, opt.max_m);
+    Solfile = string.format('%sdata/%s/Sol_N%d_M%d',getRootDir(), ttmode, opt.max_n, opt.max_m);
     local loaded = mattorch.load(Solfile..'.mat')
-    allSol = loaded.allSol:t() -- TODO why is it transposed?    
+    allSol = loaded.allSol:t() -- TODO why is it transposed?
   end
-    
-  
-  
+
+
+
   pm('Loaded data matrix of size '..allQ:size(1) .. ' x '..allQ:size(2))
   pm('Loaded soln matrix of size '..allSol:size(1) .. ' x '..allSol:size(2))
   local samplesNeeded = opt.synth_training*opt.mini_batch_size + (opt.synth_valid*opt.mini_batch_size)
   if allQ:size(1) < samplesNeeded then
     error('not enough data...')
   end
-  
+
   allQ = dataToGPU(allQ)
   allSol = dataToGPU(allSol)
-  
+
   local nth = 0 -- counter for reading lines
---  local solSize = opt.max_n*opt.max_m -- one hot
---  local opt.solSize = opt.max_n -- integer
-  
+  --  local solSize = opt.max_n*opt.max_m -- one hot
+  --  local opt.solSize = opt.max_n -- integer
+
   -- training data
   pm('training data...')
-  local nSamples = opt.synth_training   
+  local nSamples = opt.synth_training
   for n=1,nSamples do
     if n%math.floor(nSamples/2)==0 then print((n)*(100/(nSamples))..' %...') end
-    
+
     local oneBatch = torch.zeros(1,opt.inSize)
     local oneBatchSol = torch.zeros(1,opt.solSize)
-    
+
     for mb=1,opt.mini_batch_size do
       nth=nth+1
       oneBatch = oneBatch:cat(allQ[nth]:reshape(1,opt.inSize),1)
       oneBatchSol = oneBatchSol:cat(allSol[nth]:reshape(1,opt.solSize),1)
---      oneBatchSol = oneBatchSol:cat(getMarginals(allQ[nth]:reshape(opt.max_n,opt.max_m):float(),solTable):reshape(1,opt.max_n*opt.max_m):float(),1)
+      --      oneBatchSol = oneBatchSol:cat(getMarginals(allQ[nth]:reshape(opt.max_n,opt.max_m):float(),solTable):reshape(1,opt.max_n*opt.max_m):float(),1)
     end
     oneBatch=oneBatch:sub(2,-1)
     oneBatchSol=oneBatchSol:sub(2,-1)
     table.insert(ProbTab, oneBatch)
     table.insert(SolTab, oneBatchSol)
-  end  
-  
+  end
+
   pm('validation data...')
   -- validation data
-  local nSamples = opt.synth_valid   
+  local nSamples = opt.synth_valid
   for n=1,nSamples do
     if n%math.floor(nSamples/2)==0 then print((n)*(100/(nSamples))..' %...') end
-    
+
     local oneBatch = torch.zeros(1,opt.inSize)
     local oneBatchSol = torch.zeros(1,opt.solSize)
-    
+
     for mb=1,opt.mini_batch_size do
       nth=nth+1
       oneBatch = oneBatch:cat(allQ[nth]:reshape(1,opt.inSize),1)
       oneBatchSol = oneBatchSol:cat(allSol[nth]:reshape(1,opt.solSize),1)
---      oneBatchSol = oneBatchSol:cat(getMarginals(allQ[nth]:reshape(opt.max_n,opt.max_m):float(),solTable):reshape(1,opt.max_n*opt.max_m):float(),1)
+      --      oneBatchSol = oneBatchSol:cat(getMarginals(allQ[nth]:reshape(opt.max_n,opt.max_m):float(),solTable):reshape(1,opt.max_n*opt.max_m):float(),1)
     end
     oneBatch=oneBatch:sub(2,-1)
     oneBatchSol=oneBatchSol:sub(2,-1)
     table.insert(ValProbTab, oneBatch)
     table.insert(ValSolTab, oneBatchSol)
-  end  
-  
+  end
+
   return ProbTab, SolTab, ValProbTab, ValSolTab
 end
 
@@ -248,7 +249,7 @@ function findFeasibleSolutions(N,M)
   local feasSol = {}
 
   local permute = require 'pl.permute';
-  
+
   local lin = torch.linspace(1,N,N):totable()
   local allPermutations = permute.table(lin)
   for k,v in pairs(allPermutations) do
@@ -257,7 +258,7 @@ function findFeasibleSolutions(N,M)
       ass[i][v[i]]=1
     end
     table.insert(feasSol, ass)
-  end  
+  end
 
 
   solTable = {}
@@ -265,7 +266,7 @@ function findFeasibleSolutions(N,M)
   solTable.infSol = infSol
 
   print('Feasible solutions: '..#feasSol)
---  abort()
+  --  abort()
 
   return solTable
 
@@ -317,8 +318,8 @@ function getRNNInput(t, rnn_state, predictions)
   local rnninp = {}
 
   -- Cost matrix
-  local loccost = probs:clone():reshape(opt.mini_batch_size, opt.inSize)
-  loccost = probToCost(loccost)
+  local loccost = costs:clone():reshape(opt.mini_batch_size, opt.inSize)
+--  loccost = probToCost(loccost)
   table.insert(rnninp, loccost)
 
   for i = 1,#rnn_state[t-1] do table.insert(rnninp,rnn_state[t-1][i]) end
@@ -354,75 +355,102 @@ end
 
 --------------------------------------------------------------------------
 --- print all values for looking at them :)
--- @param P     The probability matrix
--- @param PredP Predicted (marginal) probabilities matrix
-function printDebugValues(P, PredP)
+-- @param C     The cost matrix
+-- @param Pred  Predicted values from LSTM
+function printDebugValues(C, Pred)
 
-  local C = probToCost(P) -- negative log-probability (cost)
-  local N,M = getDataSize(P)
-  --  local P = torch.exp(-C)
-  --  for i = 1,N do
-  --    P[i] = P[i]/torch.sum(P[i])
-  --  end
-
+--  local C = probToCost(C) -- negative log-probability (cost)
+  --  local N,M = getDataSize(P)
+  local N,M = opt.max_n, opt.max_m
 
   --  print('Cost matrix')
-  local minv, mini = torch.min(C,2)
-  minv=minv:reshape(N) mini=mini:reshape(N)
+  if opt.problem == 'linear' then
+    local minv, mini = torch.min(C,2)
+    minv=minv:reshape(N) mini=mini:reshape(N)
 
-  local HunAss = hungarianL(C)
-  local marginals = getMarginals(P,solTable)
+    local HunAss = hungarianL(C)
+    local marginals = getMarginals(C,solTable)
 
-  local mmaxv, mmaxi = torch.max(marginals,2)
-  mmaxv=mmaxv:reshape(N) mmaxi=mmaxi:reshape(N)
+    local mmaxv, mmaxi = torch.max(marginals,2)
+    mmaxv=mmaxv:reshape(N) mmaxi=mmaxi:reshape(N)
 
-  local pmmaxv, pmmaxi = torch.max(PredP,2)
-  pmmaxv=pmmaxv:reshape(N) pmmaxi=pmmaxi:reshape(N)
+    local pmmaxv, pmmaxi = torch.max(Pred,2)
+    pmmaxv=pmmaxv:reshape(N) pmmaxi=pmmaxi:reshape(N)
 
 
 
-  print(string.format('%5s%5s%5s%5s%5s%5s|%s|%s|%s','i','NN','HA','Mar','PMar','Err',
-    getDebugTableTitle('Prob'),getDebugTableTitle('Marg'),getDebugTableTitle('Predicted Marg')))
-  for i=1,N do
-    local prLine = ''
-    prLine = prLine .. string.format('%5d%5d%5d%5d%5d%5d|',i,mini[i],HunAss[i][2],mmaxi[i],pmmaxi[i],mmaxi[i]-pmmaxi[i])
-    for j=1,M do
-      --      prLine = prLine ..  string.format('%8.4f',C[i][j])
-      prLine = prLine ..  string.format('%8.4f',P[i][j])
+    print(string.format('%5s%5s%5s%5s%5s%5s|%s|%s|%s','i','NN','HA','Mar','PMar','Err',
+      getDebugTableTitle('Cost'),getDebugTableTitle('Marg'),getDebugTableTitle('Predicted Marg')))
+    for i=1,N do
+      local prLine = ''
+      prLine = prLine .. string.format('%5d%5d%5d%5d%5d%5d|',i,mini[i],HunAss[i][2],mmaxi[i],pmmaxi[i],mmaxi[i]-pmmaxi[i])
+      for j=1,M do
+        --      prLine = prLine ..  string.format('%8.4f',C[i][j])
+        prLine = prLine ..  string.format('%8.4f',C[i][j])
+      end
+      prLine = prLine .. ' |'
+      for j=1,M do
+        prLine = prLine ..  string.format('%8.4f',marginals[i][j])
+      end
+      prLine = prLine .. ' |'
+      for j=1,M do
+        prLine = prLine ..  string.format('%8.4f',Pred[i][j])
+      end
+
+      --    prLine=prLine..'\n'
+      print(prLine)
     end
-    prLine = prLine .. ' |'
-    for j=1,M do
-      prLine = prLine ..  string.format('%8.4f',marginals[i][j])
+    --  print(probMat)
+    --  print(mini:long():reshape(N,1))
+    local NNcost = torch.sum(C:gather(2,mini:long():reshape(N,1)))
+    local HAcost = torch.sum(C:gather(2,HunAss:narrow(2,2,1):long():reshape(N,1)))
+    local Marcost = torch.sum(C:gather(2,mmaxi:long():reshape(N,1)))
+    local PMarcost = torch.sum(C:gather(2,pmmaxi:long():reshape(N,1)))
+    local MMsum = torch.sum((mmaxi-pmmaxi):ne(0)) -- sum of wrong predictions
+    --  print(NNcost,HAcost,Marcost,PMarcost)
+    print(string.format('%5s%5.2f%5.2f%5.2f%5.2f%5d','Sum',NNcost,HAcost,Marcost,PMarcost,MMsum))
+  elseif opt.problem=='quadratic' then
+    print('QBP')
+    
+    
+    for i=1,N*M do
+      local prLine = ''
+      for j=1,N*M do prLine = prLine .. string.format('%8.4f ',C[i][j]) end
+      print(prLine)
     end
-    prLine = prLine .. ' |'
-    for j=1,M do
-      prLine = prLine ..  string.format('%8.4f',PredP[i][j])
+    
+    local sol = huns:reshape(N,M)
+    
+    -- true solution
+    local smaxv, smaxi = torch.max(sol,2)
+    smaxv=smaxv:reshape(N) smaxi=smaxi:reshape(N)
+    
+    -- predicted solution
+    local pmaxv, pmaxi = torch.max(Pred, 2)
+    pmaxv=pmaxv:reshape(N) pmaxi=pmaxi:reshape(N)
+    
+    print(string.format('%5s%5s%5s%5s%5s|%s|%s|%s','i','Sol','Mar','Pred','Err',
+      getDebugTableTitle('Cost'),getDebugTableTitle('Optim'),getDebugTableTitle('Predict')))
+        
+    for i=1,N do
+      local prLine = ''
+      prLine = prLine .. string.format('%5d%5d%5d%5d%5d|',i,smaxi[i],0,pmaxi[i],smaxi[i]-pmaxi[i])
+      for j=1,M do prLine = prLine ..  string.format('%8s','') end
+      prLine = prLine .. ' |'
+      for j=1,M do prLine = prLine ..  string.format('%8.4f',sol[i][j]) end
+      prLine = prLine .. ' |'
+      for j=1,M do prLine = prLine ..  string.format('%8.4f',Pred[i][j]) end
+      print(prLine)
     end
 
-    --    prLine=prLine..'\n'
-    print(prLine)
+
+    local solProb = evalSol(sol,nil,C)
+    local predProb = evalSol(Pred:gt(.5):float(), nil, C) 
+    local MMsum = torch.sum((smaxi-pmaxi):ne(0)) -- sum of wrong predictions
+
+    print(string.format('%5s%5.2f%5.2f%5.2f%5d|','Prod',solProb,0,predProb,MMsum))
+  
   end
-  --  print(probMat)
-  --  print(mini:long():reshape(N,1))
-  local NNcost = torch.prod(P:gather(2,mini:long():reshape(N,1)))
-  local HAcost = torch.prod(P:gather(2,HunAss:narrow(2,2,1):long():reshape(N,1)))
-  local Marcost = torch.prod(P:gather(2,mmaxi:long():reshape(N,1)))
-  local PMarcost = torch.prod(P:gather(2,pmmaxi:long():reshape(N,1)))
-  local MMsum = torch.sum((mmaxi-pmmaxi):ne(0)) -- sum of wrong predictions
-  --  print(NNcost,HAcost,Marcost,PMarcost)
-  print(string.format('%5s%5.2f%5.2f%5.2f%5.2f%5d','Prod',NNcost,HAcost,Marcost,PMarcost,MMsum))
-  --  print(C)
-  --  print(mini)
-  --  print(C:index(1,mini))
-  --  print(string.format('%8s%8.4f%8.4f%8.4f|  ---  Cost ---','-',torch.sum(C[mini]),torch.sum(C[mmaxi]),0))
-
-  --  print('NN')
-  --  print(mini)
-  --  print('Hungarian')
-  --  print(HunAss)
-  --  print('Marginals')
-  --  print(marginals)
-  --  print(mmaxi)
 
 
 end
@@ -434,4 +462,22 @@ function createAuxDirs()
   mkdirP(rootDir..'/out')
   mkdirP(rootDir..'/config')
   mkdirP(rootDir..'/graph')
+  mkdirP(rootDir..'/data')
+  mkdirP(rootDir..'/data/train')
+  mkdirP(rootDir..'/data/test')
+end
+
+function evalSol(sol, c, Q)
+  -- create a zero unary vector if not given
+  if c==0 or c==nil then c=torch.zeros(1,opt.max_n*opt.max_m) end
+  if Q==0 or Q==nil then Q=torch.zeros(opt.max_n*opt.max_m, opt.max_n*opt.max_m) end
+  assert(c:nElement()==opt.max_n*opt.max_m, 'c not valid')
+  assert(Q:nElement()==opt.max_n*opt.max_m*opt.max_n*opt.max_m, 'Q not valid')
+  
+  sol = sol:reshape(opt.max_n*opt.max_m,1)
+  c = c:reshape(1,opt.max_n*opt.max_m)
+  Q = Q:reshape(opt.max_n*opt.max_m,opt.max_n*opt.max_m)
+  
+  local ret = c * sol + sol:t() * Q * sol
+  return ret:squeeze()
 end

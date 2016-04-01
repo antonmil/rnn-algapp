@@ -5,7 +5,7 @@ require 'optim'
 require 'lfs'
 require 'gnuplot'
 require 'util.misc'
---require 'external.simple-kalman'
+require 'mattorch'
 
 require 'aux'
 
@@ -17,7 +17,7 @@ cmd:text()
 cmd:text('Options')
 -- main options
 cmd:option('-model_name','trainHun','main model name')
-cmd:option('-model_sign','mt1_r100_l1_n4_m4_val','model signature')
+cmd:option('-model_sign','mt1_r100_l1_n3_m3_val','model signature')
 cmd:option('-seed',12,'Random seed')
 cmd:text()
 -- parse input params
@@ -26,9 +26,8 @@ sopt = cmd:parse(arg)
 
 torch.setdefaulttensortype('torch.FloatTensor')
 torch.manualSeed(sopt.seed)
-torch.manualSeed(888)
 
-sopt.model = 'bin/'..sopt.model_name
+sopt.model = getRootDir()..'bin/'..sopt.model_name
 if sopt.model_sign ~= '' then sopt.model = sopt.model..'_'..sopt.model_sign end
 sopt.model = sopt.model..'.t7'
 
@@ -36,6 +35,7 @@ sopt.model = sopt.model..'.t7'
 
 if not lfs.attributes(sopt.model, 'mode') then
     print('Error: File ' .. sopt.model .. ' does not exist.?')
+    abort('...')
 end
 if lfs.attributes('/home/h3/','mode') then sopt.suppress_x=1 end
 print('Loading model ... '..sopt.model)
@@ -49,7 +49,12 @@ opt.mini_batch_size = 1
 
 init_state = getInitState(opt, miniBatchSize)
 solTable =  findFeasibleSolutions(opt.max_n, opt.max_m)
-ValProbsTab,ValHunTab = genHunData(1)
+if opt.problem == 'linear' then
+  ValProbTab,ValSolTab = genHunData(1)
+elseif opt.problem == 'quadratic' then
+  _,_,ValProbTab,ValSolTab = readQBPData('test')
+end
+local nthSample=1
 
 
 
@@ -65,8 +70,8 @@ local T = opt.max_n
 local GTDA = {}
 
 
-probs = ValProbsTab[1]:clone()
-huns = ValHunTab[1]:clone()
+costs = ValProbTab[nthSample]:clone()
+huns = ValSolTab[nthSample]:clone()
 --print(probs)
 --abort()
 --
@@ -107,5 +112,10 @@ local predDA = decode(predictions):reshape(opt.max_n,opt.nClasses)
 
 --print(predDA)
 --print(probToCost(predDA))
-printDebugValues(probs:reshape(opt.max_n,opt.max_m), costToProb(-predDA))
+local inpVec = costs:clone()
+if opt.problem=='linear' then inpVec=inpVec:reshape(opt.max_n,opt.max_m)
+elseif opt.problem=='quadratic' then inpVec=inpVec:reshape(opt.max_n*opt.max_m,opt.max_n*opt.max_m)
+end
+
+printDebugValues(inpVec, -predDA)
 
