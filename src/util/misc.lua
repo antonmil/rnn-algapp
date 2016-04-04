@@ -678,6 +678,15 @@ function dataToGPU(data)
   return data
 end
 
+
+--------------------------------------------------------------------------
+--- Experimental: converts a CudaTensor to float
+function dataToCPU(data)
+--   if true then return data end
+  if data==nil then return nil end
+  return data:float()
+end
+
 --------------------------------------------------------------------------
 --- Returns number of elements in a table, as well as min. and max. key
 -- @return Length of table (number of keys)
@@ -2250,17 +2259,13 @@ function getMarginals(C, solTable)
   
   for key, var in pairs(solTable.feasSol) do
   	local idx = var:eq(1)              -- find assignments
-  	local hypCost = torch.sum(C[idx])  -- gather probabilites
+--  	local hypCost = torch.sum(C[idx])  -- gather probabilites
+  	local hypCost = evalSol(var, C)   -- get solution for one assignment hypothesis
   	marginals[idx] = marginals[idx] + torch.exp(-hypCost)   -- add to joint matrix
   end
 
   
   marginals = makeProb(marginals) -- make probability
---  marginals = costToProb(marginals)
-  
---  print(marginals)
-  
---  abort() 
 
   marginals = dataToGPU(marginals)
   return marginals
@@ -2283,4 +2288,9 @@ function makeProb(P)
   local N,M = getDataSize(P)  -- get size of cost matrix
   for i=1,N do P[i] = P[i]/torch.sum(P[i]) end  -- normalize row-wise
   return P
+end
+
+function factorial(n)
+  if n<=1 then return 1 end
+  return n*factorial(n-1)
 end

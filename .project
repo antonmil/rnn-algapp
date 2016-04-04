@@ -14,11 +14,4 @@
 	<natures>
 		<nature>org.eclipse.ldt.nature</nature>
 	</natures>
-	<linkedResources>
-		<link>
-			<name>util</name>
-			<type>2</type>
-			<location>/home/amilan/research/projects/rnn-algapp/src</location>
-		</link>
-	</linkedResources>
 </projectDescription>

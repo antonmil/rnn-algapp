@@ -225,8 +225,20 @@ function saveCheckpoint(savefile, tracks, detections, protos, opt, trainLosses, 
   local checkpoint = {}
   -- checkpoint.detections = detections:float()
   -- checkpoint.gt = tracks:float()
-  for k,v in pairs(protos) do protos[k] = protos[k]:float() end
-  checkpoint.protos = protos
+--  local linMod = protos.rnn:findModules('nn.Linear');  for k,v in pairs(linMod) do print(v.weight[1][1]) break end
+
+  local saveProtos = {}
+  for k,v in pairs(protos) do saveProtos[k] = protos[k]:clone() end
+  for k,v in pairs(saveProtos) do saveProtos[k] = saveProtos[k]:float() end  
+  -- convert the networks to be CPU models
+--  for k,v in pairs(checkpoint.protos) do
+--    print('converting ' .. k .. ' to CPU')
+--    checkpoint.protos[k]=checkpoint.protos[k]:double()
+--  end 
+  
+--  local linMod = saveProtos.rnn:findModules('nn.Linear');  for k,v in pairs(linMod) do print(v.weight[1][1]) break end
+  checkpoint.protos = saveProtos
+  
   checkpoint.opt = opt
   -- checkpoint.trainLosses = trainLosses
   checkpoint.i = opt.max_epochs

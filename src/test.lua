@@ -42,19 +42,42 @@ print('Loading model ... '..sopt.model)
 checkpoint = torch.load(sopt.model)
 
 protos = checkpoint.protos
+
 protos.rnn:evaluate()
 opt = checkpoint.opt
 ------ Change some options for testing
 opt.mini_batch_size = 1
+opt.gpuid=-1
+opt.synth_training, opt.synth_valid = 2,2
 
 init_state = getInitState(opt, miniBatchSize)
 solTable =  findFeasibleSolutions(opt.max_n, opt.max_m)
+
+pm('getting training/validation data...')
 if opt.problem == 'linear' then
-  ValProbTab,ValSolTab = genHunData(1)
+    ValCostTab,ValSolTab = genHunData(opt.synth_valid)
 elseif opt.problem == 'quadratic' then
-  _,_,ValProbTab,ValSolTab = readQBPData('test')
+  _,_,ValCostTab,ValSolTab = readQBPData('test')
 end
-local nthSample=1
+
+
+-- normalize to [0,1]
+pm('normalizing...')
+ValCostTab = normalizeCost(ValCostTab)  
+
+if opt.inference == 'marginal' then
+  pm('Computing marginals...')
+  ValSolTab = computeMarginals(ValCostTab)
+end
+
+
+
+--if opt.problem == 'linear' then
+--  ValProbTab,ValSolTab = genHunData(1)
+--elseif opt.problem == 'quadratic' then
+--  _,_,ValProbTab,ValSolTab = readQBPData('test')
+--end
+local nthSample=2
 
 
 
@@ -70,9 +93,9 @@ local T = opt.max_n
 local GTDA = {}
 
 
-costs = ValProbTab[nthSample]:clone()
+costs = ValCostTab[nthSample]:clone()
 huns = ValSolTab[nthSample]:clone()
---print(probs)
+--print(huns:reshape(opt.max_n, opt.max_m))
 --abort()
 --
 --local probMatrix = torch.Tensor({{0.6, 0.35, 0.05},{0.4, 0.21, 0.39},{0.33, 0.32, 0.35}})
@@ -105,11 +128,11 @@ for t=1,T do
 end
 
 local predDA = decode(predictions):reshape(opt.max_n,opt.nClasses)
-
+predDA=costToProb(-predDA)
 
 
 --local costs = torch.rand(3,3)
-
+--print(opt.inSize)
 --print(predDA)
 --print(probToCost(predDA))
 local inpVec = costs:clone()
@@ -117,5 +140,5 @@ if opt.problem=='linear' then inpVec=inpVec:reshape(opt.max_n,opt.max_m)
 elseif opt.problem=='quadratic' then inpVec=inpVec:reshape(opt.max_n*opt.max_m,opt.max_n*opt.max_m)
 end
 
-printDebugValues(inpVec, -predDA)
+printDebugValues(inpVec, predDA)
 

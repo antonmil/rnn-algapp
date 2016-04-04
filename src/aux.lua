@@ -70,7 +70,7 @@ function genHunData(nSamples)
 
     local oneCost = getOneCost()
     --    print(oneProb)
---    local oneProb = makeProb(oneCost:reshape(opt.mini_batch_size*opt.max_n, opt.nClasses)):reshape(opt.mini_batch_size, opt.max_n * opt.nClasses)
+    --    local oneProb = makeProb(oneCost:reshape(opt.mini_batch_size*opt.max_n, opt.nClasses)):reshape(opt.mini_batch_size, opt.max_n * opt.nClasses)
 
 
     --     oneCost = oneCost:cat(torch.ones(miniBatchSize, maxTargets)*missThr)
@@ -181,17 +181,30 @@ function readQBPData(ttmode)
     allSol = loaded.allSol:t() -- TODO why is it transposed?
   end
 
+  allQ=allQ:float()
+  allSol=allSol:float()
 
 
   pm('Loaded data matrix of size '..allQ:size(1) .. ' x '..allQ:size(2))
   pm('Loaded soln matrix of size '..allSol:size(1) .. ' x '..allSol:size(2))
-  local samplesNeeded = opt.synth_training*opt.mini_batch_size + (opt.synth_valid*opt.mini_batch_size)
-  if allQ:size(1) < samplesNeeded then
-    error('not enough data...')
+
+  local totalDataSamples = allQ:size(1)
+  local trainSamplesNeeded = opt.synth_training*opt.mini_batch_size
+  local validSamplesNeeded = opt.synth_valid*opt.mini_batch_size
+  local totalSamplesNeeded = trainSamplesNeeded + validSamplesNeeded
+  local maxTrainingSample = math.min(trainSamplesNeeded,totalDataSamples-validSamplesNeeded)
+  pm('We will need ' .. trainSamplesNeeded .. ' training samples')
+  pm('We will need ' .. validSamplesNeeded .. ' validation samples')
+  pm(string.format('We will use %.1f %% of data for training', trainSamplesNeeded/totalDataSamples*100))
+
+  if totalDataSamples < totalSamplesNeeded then
+    if totalDataSamples < validSamplesNeeded then
+      error('not enough data...')
+    end
   end
 
-  allQ = dataToGPU(allQ)
-  allSol = dataToGPU(allSol)
+--  allQ = dataToGPU(allQ)
+--  allSol = dataToGPU(allSol)
 
   local nth = 0 -- counter for reading lines
   --  local solSize = opt.max_n*opt.max_m -- one hot
@@ -208,18 +221,22 @@ function readQBPData(ttmode)
 
     for mb=1,opt.mini_batch_size do
       nth=nth+1
+      if nth>maxTrainingSample then nth=1 end
       oneBatch = oneBatch:cat(allQ[nth]:reshape(1,opt.inSize),1)
       oneBatchSol = oneBatchSol:cat(allSol[nth]:reshape(1,opt.solSize),1)
       --      oneBatchSol = oneBatchSol:cat(getMarginals(allQ[nth]:reshape(opt.max_n,opt.max_m):float(),solTable):reshape(1,opt.max_n*opt.max_m):float(),1)
     end
     oneBatch=oneBatch:sub(2,-1)
     oneBatchSol=oneBatchSol:sub(2,-1)
+    oneBatch = dataToGPU(oneBatch)
+    oneBatchSol = dataToGPU(oneBatchSol)
     table.insert(ProbTab, oneBatch)
     table.insert(SolTab, oneBatchSol)
   end
 
   pm('validation data...')
   -- validation data
+  nth=maxTrainingSample
   local nSamples = opt.synth_valid
   for n=1,nSamples do
     if n%math.floor(nSamples/2)==0 then print((n)*(100/(nSamples))..' %...') end
@@ -235,6 +252,8 @@ function readQBPData(ttmode)
     end
     oneBatch=oneBatch:sub(2,-1)
     oneBatchSol=oneBatchSol:sub(2,-1)
+    oneBatch = dataToGPU(oneBatch)
+    oneBatchSol = dataToGPU(oneBatchSol)    
     table.insert(ValProbTab, oneBatch)
     table.insert(ValSolTab, oneBatchSol)
   end
@@ -242,9 +261,84 @@ function readQBPData(ttmode)
   return ProbTab, SolTab, ValProbTab, ValSolTab
 end
 
+function computeMarginals(CostTab)
+  local SolTab = {}
+  
+  local N,M = opt.max_n, opt.max_m
+  for k,v in pairs(CostTab) do
+  
+    if k%math.floor(#CostTab/10)==0 then print((k)*(100/(#CostTab))..' %...') end
+    
+    local batchMarginals = torch.zeros(opt.mini_batch_size,N*M):float()
+    for mb=1,opt.mini_batch_size do
+      local C = dataToCPU(v:sub(mb,mb))
+--      print(k,mb)
+     
+          
+      local marginals = torch.zeros(N,M):double() -- double precision necessary here
+      for key, var in pairs(solTable.feasSol) do
+        local idx = var:eq(1)              -- find assignments
+        local hypCost = 0
+        if opt.problem=='linear' then 
+          hypCost = evalSol(var, C)   -- get solution for one assignment hypothesis
+        elseif opt.problem=='quadratic' then
+          hypCost = evalSol(var, nil, C)   -- get solution for one assignment hypothesis
+        end
+--        print(hypCost)
+--        print(torch.exp(-hypCost))
+        marginals[idx] = marginals[idx] + torch.exp(-hypCost)   -- add to joint matrix
+      end
+      
+--      print(marginals)
+--      print('---')
+--      print(C[1][1])
+--      print(marginals[1][1])
+--      local beforeProb = marginals:clone()
+      marginals = makeProb(marginals)
+--      print(marginals[1][1])
+--      if marginals[1][1]~=marginals[1][1] then
+--        print(k)
+--        print(beforeProb)
+--        print(torch.sum(beforeProb,2))
+--        for i=1,N do
+--          print(i)
+--          print(beforeProb[i]) 
+--          print(torch.sum(beforeProb[i]))
+--          print(beforeProb[i]/torch.sum(beforeProb[i])) 
+--        end
+--        print(marginals)
+--        abort()
+--      end
+--      sleep(.1)
+      batchMarginals[mb] = marginals:reshape(1,N*M)
+    end
+    table.insert(SolTab, dataToGPU(batchMarginals))
+  end
+  
+  
+  return SolTab
+end
+
+function normalizeCost(CostTab)
+  for k,v in pairs(CostTab) do
+--    print(CostTab[k])
+    for mb=1,opt.mini_batch_size do
+      local oneCost = v[mb]:clone()
+      local minv = torch.min(oneCost)
+      oneCost = oneCost - minv
+      local maxv = torch.max(oneCost)
+      CostTab[k][mb] = oneCost / maxv
+    end
+--    print(CostTab[k])
+--    abort()
+    
+  end
+  return CostTab
+end
 
 
 function findFeasibleSolutions(N,M)
+  pm(string.format('Finding all feasible %d x %d assignments...',N,M))
   -- using Penlight permute
   local feasSol = {}
 
@@ -319,7 +413,7 @@ function getRNNInput(t, rnn_state, predictions)
 
   -- Cost matrix
   local loccost = costs:clone():reshape(opt.mini_batch_size, opt.inSize)
---  loccost = probToCost(loccost)
+  --  loccost = probToCost(loccost)
   table.insert(rnninp, loccost)
 
   for i = 1,#rnn_state[t-1] do table.insert(rnninp,rnn_state[t-1][i]) end
@@ -359,8 +453,10 @@ end
 -- @param Pred  Predicted values from LSTM
 function printDebugValues(C, Pred)
 
---  local C = probToCost(C) -- negative log-probability (cost)
+  --  local C = probToCost(C) -- negative log-probability (cost)
   --  local N,M = getDataSize(P)
+  C=dataToCPU(C)
+  Pred=dataToCPU(Pred)
   local N,M = opt.max_n, opt.max_m
 
   --  print('Cost matrix')
@@ -410,31 +506,45 @@ function printDebugValues(C, Pred)
     --  print(NNcost,HAcost,Marcost,PMarcost)
     print(string.format('%5s%5.2f%5.2f%5.2f%5.2f%5d','Sum',NNcost,HAcost,Marcost,PMarcost,MMsum))
   elseif opt.problem=='quadratic' then
-    print('QBP')
-    
-    
-    for i=1,N*M do
-      local prLine = ''
-      for j=1,N*M do prLine = prLine .. string.format('%8.4f ',C[i][j]) end
-      print(prLine)
+    if N<4 and M<4 then
+      print('QBP')
+
+
+      for i=1,N*M do
+        local prLine = ''
+        for j=1,N*M do prLine = prLine .. string.format('%8.4f ',C[i][j]) end
+        print(prLine)
+      end
+    end
+
+    local sol = huns:sub(1,1)
+    if opt.solution=='integer' then
+      sol=getOneHotLab(sol, true)
+    else
+      sol=sol:reshape(N,M)
     end
     
-    local sol = huns:reshape(N,M)
-    
+    sol=dataToCPU(sol)
+
     -- true solution
     local smaxv, smaxi = torch.max(sol,2)
     smaxv=smaxv:reshape(N) smaxi=smaxi:reshape(N)
-    
+
     -- predicted solution
     local pmaxv, pmaxi = torch.max(Pred, 2)
     pmaxv=pmaxv:reshape(N) pmaxi=pmaxi:reshape(N)
-    
+
+    if opt.inference == 'map' then
     print(string.format('%5s%5s%5s%5s%5s|%s|%s|%s','i','Sol','Mar','Pred','Err',
       getDebugTableTitle('Cost'),getDebugTableTitle('Optim'),getDebugTableTitle('Predict')))
-        
+    elseif opt.inference=='marginal' then
+      print(string.format('%5s%5s%5s%5s%5s|%s|%s|%s','i','Sol','Mar','Pred','Err',
+        getDebugTableTitle('Cost'),getDebugTableTitle('Marginal'),getDebugTableTitle('Pred Marg')))
+    end
+
     for i=1,N do
       local prLine = ''
-      prLine = prLine .. string.format('%5d%5d%5d%5d%5d|',i,smaxi[i],0,pmaxi[i],smaxi[i]-pmaxi[i])
+      prLine = prLine .. string.format('%5d%5d%5d%5d%5d|',i,smaxi[i],smaxi[i],pmaxi[i],smaxi[i]-pmaxi[i])
       for j=1,M do prLine = prLine ..  string.format('%8s','') end
       prLine = prLine .. ' |'
       for j=1,M do prLine = prLine ..  string.format('%8.4f',sol[i][j]) end
@@ -443,13 +553,18 @@ function printDebugValues(C, Pred)
       print(prLine)
     end
 
+    local s = dataToCPU(getOneHotLab(pmaxi,true))
+    local maxMargins = dataToCPU(getOneHotLab(pmaxi,true))
+    local maxSol = sol:clone()
+    if opt.solution == 'distribution' then  maxSol=dataToCPU(getOneHotLab(smaxi, true)) end
 
-    local solProb = evalSol(sol,nil,C)
-    local predProb = evalSol(Pred:gt(.5):float(), nil, C) 
+
+    local solProb = evalSol(maxSol,nil,C)
+    local predProb = evalSol(maxMargins, nil, C)
     local MMsum = torch.sum((smaxi-pmaxi):ne(0)) -- sum of wrong predictions
 
-    print(string.format('%5s%5.2f%5.2f%5.2f%5d|','Prod',solProb,0,predProb,MMsum))
-  
+    print(string.format('%5s%5.1f%5.1f%5.1f%5d|','Cost',solProb,0,predProb,MMsum))
+
   end
 
 
@@ -473,11 +588,11 @@ function evalSol(sol, c, Q)
   if Q==0 or Q==nil then Q=torch.zeros(opt.max_n*opt.max_m, opt.max_n*opt.max_m) end
   assert(c:nElement()==opt.max_n*opt.max_m, 'c not valid')
   assert(Q:nElement()==opt.max_n*opt.max_m*opt.max_n*opt.max_m, 'Q not valid')
-  
+
   sol = sol:reshape(opt.max_n*opt.max_m,1)
   c = c:reshape(1,opt.max_n*opt.max_m)
   Q = Q:reshape(opt.max_n*opt.max_m,opt.max_n*opt.max_m)
-  
+
   local ret = c * sol + sol:t() * Q * sol
   return ret:squeeze()
 end

@@ -9,6 +9,8 @@ require 'lfs'
 require 'image'
 require 'mattorch'
 
+torch.setdefaulttensortype('torch.FloatTensor')
+
 local model_utils = require 'util.model'    -- model specific utils
 require 'util.misc'   -- all the rest
 local RNN = require 'model.RNN'
@@ -23,7 +25,7 @@ torch.manualSeed(1)
 -- for graph debugging
 nngraph.setDebug(true)
 
-torch.setdefaulttensortype('torch.FloatTensor')
+
 
 
 
@@ -42,7 +44,7 @@ cmd:option('-max_n',2,'number of rows')
 cmd:option('-max_m',2,'number of columns')
 cmd:option('-lambda',1,'loss weighting')
 cmd:option('-problem','quadratic','[linear|quadratic]')
-cmd:option('-inference','MAP','[MAP|marginal]')
+cmd:option('-inference','map','[map|marginal]')
 cmd:option('-solution','integer','[integer|distribution]')
 -- optimization
 cmd:option('-lrng_rate',1e-2,'learning rate')
@@ -93,6 +95,8 @@ createAuxDirs()
 
 -- augment and fix opt --
 opt.model = string.lower(opt.model) -- make model name lower case
+opt.inference = string.lower(opt.inference)
+if string.find(opt.inference,'marg')~=nil then opt.inference='marginal' end
 opt.model_index=1
 if opt.model=='gru' then opt.model_index=2; end
 if opt.model=='rnn' then opt.model_index=3; end 
@@ -194,16 +198,36 @@ pm('   ...done',2)
 
 ----- gen data for Hungarian
 solTable =  findFeasibleSolutions(opt.max_n, opt.max_m) -- get feasible solutions
-TrCostTab,TrSolTab = genHunData(opt.synth_training)
-ValCostTab,ValSolTab = genHunData(opt.synth_valid)
 
---print(solTable)
---abort()
---TrCostTab,TrSolTab = genMarginalsData(opt.synth_training)
---ValCostTab,ValSolTab = genMarginalsData(opt.synth_valid)
+pm('getting training/validation data...')
+if opt.problem == 'linear' then
+--  if opt.inference == 'map' then
+    TrCostTab,TrSolTab = genHunData(opt.synth_training)
+    ValCostTab,ValSolTab = genHunData(opt.synth_valid)
+--  elseif opt.inference == 'marginal' then    
+--    TrCostTab,TrSolTab = genMarginalsData(opt.synth_training)
+--    ValCostTab,ValSolTab = genMarginalsData(opt.synth_valid)
+--  end
+elseif opt.problem == 'quadratic' then
+  TrCostTab,TrSolTab,ValCostTab,ValSolTab = readQBPData('train')
+end
 
---TrCostTab,TrSolTab,ValCostTab,ValSolTab = readQBPData('train')
---print(TrProbTab[1])
+
+-- normalize to [0,1]
+pm('normalizing...')
+TrCostTab = normalizeCost(TrCostTab)
+ValCostTab = normalizeCost(ValCostTab)
+
+
+if opt.inference == 'marginal' then
+  pm('Computing marginals...')
+  TrSolTab = computeMarginals(TrCostTab)
+  ValSolTab = computeMarginals(ValCostTab)
+end
+
+
+
+--
 --print(TrSolTab[1])
 --print(ValProbTab[1])
 --print(ValSolTab[1])
@@ -285,32 +309,33 @@ function eval_val()
       local predDA=costToProb(-logpredDA)
       
       local hun = huns:sub(1,1)
---      print(hun)
---      local cmtr = probs:sub(1,1):reshape(opt.max_n,opt.max_m)
---      print(predDA)
---      print(cmtr)
---      printDebugValues(cmtr:reshape(opt.max_n,opt.max_m), predDA:reshape(opt.max_n, opt.max_m))
-----
-    eval_val_mm = 0
-    local pmmaxv, pmmaxi = torch.max(predDA,2)
-    -- marginals   
---    local marginals = getMarginals(cmtr,solTable)
---    local mmaxv, mmaxi = torch.max(marginals,2)    
---    eval_val_mm = torch.sum(torch.abs(mmaxi-pmmaxi):ne(0))
-    
-    -- greedy
-    local sol = hun:reshape(opt.max_n,1)
-    if opt.solution == 'distribution' then
-      local sv, si = torch.max(hun:reshape(opt.max_n, opt.max_m),2)
-      sol = si:clone()
-    end
 
-    eval_val_mm = torch.sum(torch.abs(sol:float()-pmmaxi:float()):ne(0))
+      eval_val_mm = 0
+      local pmmaxv, pmmaxi = torch.max(predDA,2)
+      local cmtr = costs:sub(1,1)
+  --    print(cmtr)
+      if opt.problem == 'linear' then cmtr = cmtr:reshape(opt.max_n,opt.max_m)
+      elseif opt.problem == 'quadratic' then cmtr = cmtr:reshape(opt.max_n*opt.max_m,opt.max_n*opt.max_m)
+      end
       
-    
---      eval_val_mm = getDAErrorHUN(predDA:reshape(opt.max_n,1,opt.nClasses), mmaxi:reshape(opt.max_n,1))
-      --       print(eval_val_mm)
-      --       abort()
+      printDebugValues(cmtr, predDA:reshape(opt.max_n, opt.max_m))
+       
+      if opt.inference == 'map' then
+        -- greedy        
+        local sol = hun:reshape(opt.max_n,1)
+        if opt.solution == 'distribution' then
+        local sv, si = torch.max(hun:reshape(opt.max_n, opt.max_m),2)
+          sol = si:clone()
+        end      
+        eval_val_mm = torch.sum(torch.abs(sol:float()-pmmaxi:float()):ne(0))
+      elseif opt.inference == 'marginal' then
+        -- marginals                 
+--        local marginals = getMarginals(cmtr,solTable)
+        local marginals = hun:reshape(opt.max_n, opt.max_m)
+        local mmaxv, mmaxi = torch.max(marginals,2)
+       
+        eval_val_mm = torch.sum(torch.abs(mmaxi-pmmaxi):ne(0))
+      end
     end    
 
 --         eval_val_mm = 0
@@ -485,8 +510,8 @@ for i = 1, opt.max_epochs do
     val_loss = eval_val()
     val_losses[i] = math.max(val_loss, 1e-5)
 
-    train_mm[i] = feval_mm+.001
-    val_mm[i] = eval_val_mm+.001
+    train_mm[i] = feval_mm+1
+    val_mm[i] = eval_val_mm+1
     real_mm[i] = eval_benchmark_mm+1
 
     train_ma[i] = feval_multass+1
