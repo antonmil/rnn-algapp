@@ -2240,9 +2240,22 @@ function mkdirP(dir)
   if not lfs.attributes(dir) then lfs.mkdir(dir) end
 end
 
+--------------------------------------------------------------------------
+--- Check if given file/dir exists
+-- @param path
+function exist(path)
+  if lfs.attributes(path) then return true end
+  return false
+end
 
-
-
+--------------------------------------------------------------------------
+--- Abort if file does not exist
+-- @param file  
+-- @param file type   optional for error message
+function checkFileExist(file, type)
+  type = type or ''
+  assert(exist(file), type ..' ' .. file..'.mat cannot be found')
+end
 
 --------------------------------------------------------------------------
 --- Compute marginal assignment distributions 

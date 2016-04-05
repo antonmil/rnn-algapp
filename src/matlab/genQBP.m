@@ -1,8 +1,9 @@
 %% quadratic program data and solutions
 % first set parameters
 % problem size
-N=9;
+N=10;
 M=N;
+nTr = 100; % training batches
 A=zeros(M,N*M); Aeq=zeros(N, N*M);  % ineq and eq constr. matrices
 b=ones(M,1); beq=ones(N,1);         % ineq and eq constr. vectors
 act=1;
@@ -16,6 +17,7 @@ for j=1:M
 end
 
 ttmodes = {'train','test'};
+
 for ttm=ttmodes
     ttmode = char(ttm);
     % ttmode = 'test';
@@ -30,12 +32,12 @@ for ttm=ttmodes
     model.sense = char( ['<' * ones(1, length(b)), '=' * ones(1,length(beq))]);
     clear params
     params.outputflag = 0;
-    params.TimeLimit = 1;
+    params.TimeLimit = .1; % time limit in seconds
     
     
     %%% How many samples do we want?
     mb = 10; % minibatch size
-    nTrainingSamples = 100 + mb;  % the +mb is for validation set
+    nTrainingSamples = nTr + mb;  % the +mb is for validation set
     nSamples = nTrainingSamples * mb;
     if strcmp(ttmode,'test'), nSamples=10; end
     printDot = 10; % how many times to print
@@ -47,7 +49,7 @@ for ttm=ttmodes
     allSol = zeros(nSamples, N*M);
     allc = zeros(nSamples, N*M);
     allSolInt = zeros(nSamples, N);
-    
+    optres=false(nSamples,1);
     
     for n=1:nSamples
         if ~mod(n,round(nSamples/printDot))
@@ -65,6 +67,20 @@ for ttm=ttmodes
         end
         Q=real(Q);
         Q=(Q' * Q); % Positive semi-definite
+        
+        
+        for ii=1:N*M, Q(ii,ii)=0; end % set diag=0
+        % only keep immediate neighbors
+        for ii=1:N
+            for jj=1:M
+                if abs(ii-jj)>1
+                    Qsub = sub2ind([N,N],jj,ii);
+                    Q(Qsub,:)=0;
+                    Q(:,Qsub)=0;
+                end
+            end
+        end
+        
         %     Q = Q - min(Q(:)) + eps;    % >= 0
         %     Q = Q / max(Q(:));          % <= 1
         %     Q = -Q;                     % negative semi-definite (because we are argmaxing)
@@ -76,14 +92,22 @@ for ttm=ttmodes
         model.obj = c;
         
         result = gurobi(model, params); % run gurobi
+        result.x(result.x>0.5)=1;
+        result.x(result.x<=0.5)=0;
         
         % insert in joint matrices
         allQ(n,:) = Q(:)'; % WARNING. IS THIS CORRECT INDEXING FOR NON_SYMM MATRICES?
         allc(n,:) = c;
-        allSol(n,:) = result.x';
+        allSol(n,:) = result.x';        
         [u,v]=find(reshape(result.x,N,M));
         allSolInt(n,:)=u';
+        if strcmpi(result.status,'optimal')
+            optres(n,1)=1;
+        end
     end
+    
+    fprintf('Optimal solutions found: %d / %d (= %.1f %%)\n',numel(find(optres)),nSamples,numel(find(optres))/nSamples*100);
+    
     
     %% write out
     Qfile = sprintf('../../data/%s/Q_N%d_M%d',ttmode,N,M);

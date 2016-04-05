@@ -22,8 +22,8 @@ function plot(data, winID, winTitle, rawStr, save)
   
   local enhancedString = ''
   local enhancedString = 'enhanced dashed "arial,16"'
-  gnuplot.raw(string.format('set term wxt %s %d', enhancedString, winID))
-  gnuplot.raw(string.format('set term wxt title "%s"',winTitle))
+  gnuplot.raw(string.format('set term wxt title "%s" %s %d', winTitle,enhancedString, winID))
+--  gnuplot.raw(string.format('set term wxt title "%s" %d',winTitle, winID))
 
   local yr = 8   -- yrange and yrange shift
   
@@ -31,16 +31,18 @@ function plot(data, winID, winTitle, rawStr, save)
   if opt.norm_std ~= nil and opt.norm_std < 0 then yr = 1 end
   local ys = yr/2
   
-  if opt.norm_mean ~= nil and opt.norm_mean == 0 then ys = 0 end
   
+  if opt.norm_mean ~= nil and opt.norm_mean == 0 then ys = 0 end
+
+  yr,ys = 1,0  
   if opt.temp_win ~= nil then
-    local rangeStr = string.format("set xrange [%d:%d]; set yrange [%f:%f]",0,opt.temp_win+1,-ys,yr-ys)
+    local rangeStr = string.format("set xrange [%d:%d]; set yrange [%f:%f]",0,opt.max_m+1,-ys,yr-ys)
    
   --   local rangeStr = string.format("set xrange [%d:%d]; set autoscale y",0,opt.temp_win+1)
     gnuplot.raw('set key outside left yrange [0:0.2]')  
     gnuplot.raw(rangeStr)
   end
-
+  
 --     gnuplot.raw('set xlabel "frame"')
 --     print(data)
 
@@ -507,6 +509,46 @@ function getExPlotTab(plotTab,predEx, tshift)
   return plotTab
 end
 
+--- Plot assignment probabilities
+function getPredPlotTab(plotTab, predDA, ptype, tshift)
+  ptype = ptype or 1 -- 1=predicted, 2=GT
+  tshift=tshift or 0
+  
+  local leg,lw,lt = 'Assn',2,1
+  
+  if ptype==2 then leg, lw, lt = 'GT',2,2 end
+  
+  local N,F = getDataSize(predDA)
+  local exFrames = torch.linspace(1,F,F)+tshift
+  for id=1,N do
+    -- line
+    local probs = predDA[id]:squeeze()/N + (id-1)/N
+    local trname = string.format("%s %d", leg,id)
+    local ls = string.format("with lines lw %d linetype %d linecolor rgbcolor %s",lw,lt,getColorFromID(id))  
+    table.insert(plotTab, {trname, exFrames, probs, ls})
+    
+    -- max dot
+    local mv,mi = torch.max(probs:reshape(1,opt.max_m),2)
+    local maxX = torch.Tensor({mi:squeeze()})
+    local maxY = torch.Tensor({mv:squeeze()})
+    local ls = string.format("with points ps %d pt %d linecolor rgbcolor %s",lw,lt,getColorFromID(id))  
+    table.insert(plotTab, {maxX,maxY,ls})
+
+    -- separators
+    if id<N then
+      local lineX = torch.Tensor({0,opt.max_m+1})
+      local lineY = torch.Tensor({id/N,id/N})
+      local ls = string.format("with lines lw %d linetype %d",1,1)
+      table.insert(plotTab, {lineX,lineY,ls})
+    end    
+    
+  end
+--   abort()
+  
+--   print(plotTab[49])
+--   abort()
+  return plotTab
+end
 --------------------------------------------------------------------------
 --[[ getGTPlotTab
   adds gt track entries to the plot table

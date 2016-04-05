@@ -25,8 +25,8 @@ torch.manualSeed(1)
 -- for graph debugging
 nngraph.setDebug(true)
 
-
-
+-- global timer
+ggtime = torch.Timer()
 
 
 -- option and parameters parsing
@@ -99,7 +99,7 @@ opt.inference = string.lower(opt.inference)
 if string.find(opt.inference,'marg')~=nil then opt.inference='marginal' end
 opt.model_index=1
 if opt.model=='gru' then opt.model_index=2; end
-if opt.model=='rnn' then opt.model_index=3; end 
+if opt.model=='rnn' then opt.model_index=3; end
 opt.nClasses = opt.max_m
 
 opt.inSize = opt.max_n * opt.nClasses -- input feature vector size (Linear Assignment)
@@ -138,7 +138,7 @@ protos = {}
 protos.rnn = RNN.rnn(opt)
 local lambda = opt.lambda
 local nllc = nn.ClassNLLCriterion()
-local bce = nn.BCECriterion()  
+local bce = nn.BCECriterion()
 local mse = nn.MSECriterion()
 local abserr = nn.AbsCriterion()
 local kl = nn.DistKLDivCriterion()
@@ -170,7 +170,7 @@ for k,v in pairs(protos) do v = dataToGPU(v) end
 
 -- put the above things into one flattened parameters tensor
 params, grad_params = model_utils.combine_all_parameters(protos.rnn)
-
+local do_random_init = true
 if do_random_init then params:uniform(-opt.rand_par_rng, opt.rand_par_rng) end
 -- initialize the LSTM forget gates with slightly higher biases to encourage remembering in the beginning
 if opt.model == 'lstm' then
@@ -201,13 +201,13 @@ solTable =  findFeasibleSolutions(opt.max_n, opt.max_m) -- get feasible solution
 
 pm('getting training/validation data...')
 if opt.problem == 'linear' then
---  if opt.inference == 'map' then
-    TrCostTab,TrSolTab = genHunData(opt.synth_training)
-    ValCostTab,ValSolTab = genHunData(opt.synth_valid)
---  elseif opt.inference == 'marginal' then    
---    TrCostTab,TrSolTab = genMarginalsData(opt.synth_training)
---    ValCostTab,ValSolTab = genMarginalsData(opt.synth_valid)
---  end
+  --  if opt.inference == 'map' then
+  TrCostTab,TrSolTab = genHunData(opt.synth_training)
+  ValCostTab,ValSolTab = genHunData(opt.synth_valid)
+  --  elseif opt.inference == 'marginal' then
+  --    TrCostTab,TrSolTab = genMarginalsData(opt.synth_training)
+  --    ValCostTab,ValSolTab = genMarginalsData(opt.synth_valid)
+  --  end
 elseif opt.problem == 'quadratic' then
   TrCostTab,TrSolTab,ValCostTab,ValSolTab = readQBPData('train')
 end
@@ -243,7 +243,7 @@ function getGTDA(tar)
     DA = huns[{{},{tar}}]:reshape(opt.mini_batch_size)
   elseif opt.solution == 'distribution' then
     -- one hot (or full prob distr.)
-    local offset = opt.max_n * (tar-1)+1  
+    local offset = opt.max_n * (tar-1)+1
     DA = huns[{{},{offset, offset+opt.max_n-1}}]
   end
 
@@ -262,19 +262,21 @@ function getPredAndGTTables(predDA, tar)
 end
 
 
-function eval_val()  
+
+function eval_val()
 
   local tL = tabLen(ValCostTab)
   local loss = 0
   local T = opt.max_n
   local plotSeq = math.random(tL)
+  plotSeq=1
   for seq=1,tL do
     costs = ValCostTab[seq]:clone()
     huns = ValSolTab[seq]:clone()
 
     TRAINING = false
-    ----- FORWARD ----   
-    local initStateGlobal = clone_list(init_state)  
+    ----- FORWARD ----
+    local initStateGlobal = clone_list(init_state)
     local rnn_state = {[0] = initStateGlobal}
     --   local predictions = {[0] = {[opt.updIndex] = detections[{{},{t}}]}}
     local predictions = {}
@@ -289,8 +291,8 @@ function eval_val()
       local rnninp, rnn_state = getRNNInput(t, rnn_state, predictions)    -- get combined RNN input table
       local lst = clones.rnn[t]:forward(rnninp) -- do one forward tick
       predictions[t] = lst
---           print(lst)
---           abort()
+      --           print(lst)
+      --           abort()
 
       rnn_state[t] = {}
       for i=1,#init_state do table.insert(rnn_state[t], lst[i]) end -- extract the state, without output
@@ -305,52 +307,23 @@ function eval_val()
 
 
     if seq==plotSeq then
-      local logpredDA = decode(predictions):reshape(opt.mini_batch_size*opt.max_n,opt.nClasses):sub(1,opt.max_n)
-      local predDA=costToProb(-logpredDA)
-      
-      local hun = huns:sub(1,1)
+      print('Validation checkpoint')
+      eval_val_mm = plotProgress(predictions,3,'Validation')
+    end
 
-      eval_val_mm = 0
-      local pmmaxv, pmmaxi = torch.max(predDA,2)
-      local cmtr = costs:sub(1,1)
-  --    print(cmtr)
-      if opt.problem == 'linear' then cmtr = cmtr:reshape(opt.max_n,opt.max_m)
-      elseif opt.problem == 'quadratic' then cmtr = cmtr:reshape(opt.max_n*opt.max_m,opt.max_n*opt.max_m)
-      end
-      
-      printDebugValues(cmtr, predDA:reshape(opt.max_n, opt.max_m))
-       
-      if opt.inference == 'map' then
-        -- greedy        
-        local sol = hun:reshape(opt.max_n,1)
-        if opt.solution == 'distribution' then
-        local sv, si = torch.max(hun:reshape(opt.max_n, opt.max_m),2)
-          sol = si:clone()
-        end      
-        eval_val_mm = torch.sum(torch.abs(sol:float()-pmmaxi:float()):ne(0))
-      elseif opt.inference == 'marginal' then
-        -- marginals                 
---        local marginals = getMarginals(cmtr,solTable)
-        local marginals = hun:reshape(opt.max_n, opt.max_m)
-        local mmaxv, mmaxi = torch.max(marginals,2)
-       
-        eval_val_mm = torch.sum(torch.abs(mmaxi-pmmaxi):ne(0))
-      end
-    end    
-
---         eval_val_mm = 0
+    --         eval_val_mm = 0
     eval_val_multass = 0
   end
   loss = loss / T / tL  -- make average over all frames
 
-  return loss  
+  return loss
 end
 
 
 
 
 seqCnt=0
-function feval()  
+function feval()
   grad_params:zero()
 
   local tL = tabLen(TrCostTab)
@@ -359,13 +332,13 @@ function feval()
   if seqCnt > tabLen(TrCostTab) then seqCnt = 1 end
   randSeq = seqCnt
 
---  randSeq = math.random(tL) -- pick a random sequence from training set
+  --  randSeq = math.random(tL) -- pick a random sequence from training set
   costs = TrCostTab[randSeq]:clone()
   huns = TrSolTab[randSeq]:clone()
 
   TRAINING = true
-  ----- FORWARD ----   
-  local initStateGlobal = clone_list(init_state)  
+  ----- FORWARD ----
+  local initStateGlobal = clone_list(init_state)
   local rnn_state = {[0] = initStateGlobal}
   --   local predictions = {[0] = {[opt.updIndex] = detections[{{},{t}}]}}
   local predictions = {}
@@ -380,24 +353,24 @@ function feval()
     local rnninp, rnn_state = getRNNInput(t, rnn_state, predictions)    -- get combined RNN input table
     local lst = clones.rnn[t]:forward(rnninp) -- do one forward tick
     predictions[t] = lst
---         print(lst)
---         abort()
+    --         print(lst)
+    --         abort()
 
---    print(rnninp[1])
+    --    print(rnninp[1])
     rnn_state[t] = {}
     for i=1,#init_state do table.insert(rnn_state[t], lst[i]) end -- extract the state, without output
     DA[t] = decode(predictions, t)
---         print(DA[t])
---         abort()
+    --         print(DA[t])
+    --         abort()
     local input, output = getPredAndGTTables(DA[t], t)
---    print(input[1])
---    print(output[1])
---    abort()
+    --    print(input[1])
+    --    print(output[1])
+    --    abort()
 
     local tloss = clones.criterion[t]:forward(input, output)
     loss = loss + tloss
---    print(tloss)
---    abort()
+    --    print(tloss)
+    --    abort()
   end
   loss = loss / T -- make average over all frames
   local predDA = decode(predictions)
@@ -407,12 +380,9 @@ function feval()
   -- plotting
   -- plotting
   if (globiter == 1) or (globiter % opt.plot_every == 0) then
-    local predDA = decode(predictions):reshape(opt.mini_batch_size*opt.max_n,opt.nClasses):sub(1,opt.max_n)
-    --       local cmtr = costs:reshape(opt.mini_batch_size*opt.max_n, opt.nClasses):sub(1,opt.max_n)
-    local hun = huns:sub(1,1)
-    predDA = torch.exp(predDA)
-    feval_mm = 0
---    feval_mm = getDAErrorHUN(predDA:reshape(opt.max_n,1,opt.nClasses), hun:reshape(opt.max_n,1))
+    print('Training checkpoint')
+    feval_mm = plotProgress(predictions,1,'Train')
+    --    feval_mm = getDAErrorHUN(predDA:reshape(opt.max_n,1,opt.nClasses), hun:reshape(opt.max_n,1))
   end
 
 
@@ -425,11 +395,11 @@ function feval()
     local dl = clones.criterion[t]:backward(input,output)
     local nGrad = #dl
 
-    for dd=1,nGrad do     
+    for dd=1,nGrad do
       table.insert(drnn_state[t], dl[dd]) -- gradient of loss at time t
     end
 
-    local rnninp, rnn_state = getRNNInput(t, rnn_state, predictions)    -- get combined RNN input table 
+    local rnninp, rnn_state = getRNNInput(t, rnn_state, predictions)    -- get combined RNN input table
 
     dlst = clones.rnn[t]:backward(rnninp, drnn_state[t])
 
@@ -438,12 +408,12 @@ function feval()
     if opt.model == 'lstm' then maxk = 2*opt.num_layers+1 end
     for k,v in pairs(dlst) do
       if k > 1 and k <= maxk then -- k == 1 is gradient on x, which we dont need
-        -- note we do k-1 because first item is dembeddings, and then follow the 
+        -- note we do k-1 because first item is dembeddings, and then follow the
         -- derivatives of the state, starting at index 2. I know...
         drnn_state[t-1][k-1] = v
       end
-    end   
-    -- TODO transfer final state? 
+    end
+    -- TODO transfer final state?
     grad_params:clamp(-opt.grad_clip, opt.grad_clip)
 
   end
@@ -476,7 +446,7 @@ for i = 1, opt.max_epochs do
   local time = timer:time().real
 
   local train_loss = loss[1] -- the loss is inside a list, pop it
-  train_losses[i] = train_loss    
+  train_losses[i] = train_loss
 
   -- exponential learning rate decay
   if i % (torch.round(opt.max_epochs/10)) == 0 and opt.lrng_rate_decay < 1 then
@@ -486,17 +456,17 @@ for i = 1, opt.max_epochs do
     local decay_factor = opt.lrng_rate_decay
     optim_state.learningRate = optim_state.learningRate * decay_factor -- decay it
     --         end
-  end        
+  end
 
   -- print training progress
   if i % opt.print_every == 0 then
-    printTrainingStats(i, opt.max_epochs, train_loss, grad_params:norm() / params:norm(), 
-      time, optim_state.learningRate, glTimer:time().real)      
-  end    
+    printTrainingStats(i, opt.max_epochs, train_loss, grad_params:norm() / params:norm(),
+      time, optim_state.learningRate, glTimer:time().real)
+  end
 
 
 
-  -- evaluate validation, save chkpt and print/plot loss (not too frequently)    
+  -- evaluate validation, save chkpt and print/plot loss (not too frequently)
   if (i % opt.eval_val_every) == 0 then
     print(os.date())
     -- plot one benchmark sequence
@@ -522,10 +492,10 @@ for i = 1, opt.max_epochs do
 
     local plot_train_mm_x, plot_train_mm = getValLossPlot(train_mm)
     local plot_val_mm_x, plot_val_mm = getValLossPlot(val_mm)
-    local plot_real_mm_x, plot_real_mm = getValLossPlot(real_mm)      
+    local plot_real_mm_x, plot_real_mm = getValLossPlot(real_mm)
 
     local plot_train_ma_x, plot_train_ma = getValLossPlot(train_ma)
-    local plot_val_ma_x, plot_val_ma = getValLossPlot(val_ma)      
+    local plot_val_ma_x, plot_val_ma = getValLossPlot(val_ma)
 
 
     --       print(train_losses)
@@ -553,7 +523,7 @@ for i = 1, opt.max_epochs do
     local minRealLoss, minRealLossIt = torch.min(plot_real_mm,1)
     minTrainLoss=minTrainLoss:squeeze()      minTrainLossIt=minTrainLossIt:squeeze()*opt.eval_val_every
     minValidLoss=minValidLoss:squeeze()      minValidLossIt=minValidLossIt:squeeze()*opt.eval_val_every
-    minRealLoss=minRealLoss:squeeze()        minRealLossIt=minRealLossIt:squeeze()*opt.eval_val_every      
+    minRealLoss=minRealLoss:squeeze()        minRealLossIt=minRealLossIt:squeeze()*opt.eval_val_every
 
     pm('--------------------------------------------------------')
     pm(string.format('%10s%10s%10s%10s','MissDA','Training','Valid','Real'))
@@ -562,8 +532,8 @@ for i = 1, opt.max_epochs do
     pm(string.format('%10s%10d%10d%10d','Iter',minTrainLossIt,  minValidLossIt, minRealLossIt))
     pm('--------------------------------------------------------')
 
-    -- save checkpt      
-    local savefile = getCheckptFilename(modelName, opt, modelParams)      
+    -- save checkpt
+    local savefile = getCheckptFilename(modelName, opt, modelParams)
     saveCheckpoint(savefile, tracks, detections, protos, opt, train_losses, glTimer:time().real, i)
 
 
@@ -582,9 +552,9 @@ for i = 1, opt.max_epochs do
       local fn, dir, base, signature, ext = getCheckptFilename(modelName, opt, modelParams)
       local savefile  = dir .. base .. '_' .. signature .. '_real' .. ext
       saveCheckpoint(savefile, tracks, detections, protos, opt, train_losses, glTimer:time().real, i)
-    end      
+    end
 
-    -- plot      
+    -- plot
     local lossPlotTab = {}
     table.insert(lossPlotTab, {"Trng loss",plot_loss_x,plot_loss, 'with linespoints lt 1'})
     table.insert(lossPlotTab, {"Vald loss",plot_val_loss_x, plot_val_loss, 'with linespoints lt 3'})
@@ -598,18 +568,18 @@ for i = 1, opt.max_epochs do
 
 
     --  local minInd = math.min(1,plot_loss:nElement())
-    local maxY = math.max(torch.max(plot_loss), torch.max(plot_val_loss), torch.max(plot_real_loss), 
+    local maxY = math.max(torch.max(plot_loss), torch.max(plot_val_loss), torch.max(plot_real_loss),
       torch.max(plot_train_mm), torch.max(plot_val_mm), torch.max(plot_real_mm))*2
-    local minY = math.min(torch.min(plot_loss), torch.min(plot_val_loss), torch.min(plot_real_loss), 
+    local minY = math.min(torch.min(plot_loss), torch.min(plot_val_loss), torch.min(plot_real_loss),
       torch.min(plot_train_mm), torch.min(plot_val_mm), torch.min(plot_real_mm))/2
-    rangeStr = string.format("set xrange [%d:%d];set yrange [%f:%f]", 
+    rangeStr = string.format("set xrange [%d:%d];set yrange [%f:%f]",
       opt.eval_val_every-1, i+1, minY, maxY)
     --       rangeStr = string.format("set yrange [%f:%f]", minY, maxY)
     local rawStr = {}
     table.insert(rawStr, rangeStr)
     table.insert(rawStr, 'set logscale y')
 
-    local winTitle = string.format('Loss-%06d-%06d',itOffset+1,opt.max_epochs+itOffset)      
+    local winTitle = string.format('Loss-%06d-%06d',itOffset+1,opt.max_epochs+itOffset)
     plot(lossPlotTab, 2, winTitle, rawStr, 1) -- plot and save (true)
     gnuplot.raw('unset logscale') -- for other plots
 
@@ -617,9 +587,12 @@ for i = 1, opt.max_epochs do
     printModelOptions(opt, modelParams) -- print parameters
   end
 
-  if i == 1 or i % (opt.print_every*10) == 0 then 
+  if (i == 1 or i % (opt.print_every*10) == 0) and i<opt.max_epochs then
     printModelOptions(opt, modelParams)
-    printTrainingHeadline() 
+    printTrainingHeadline()
   end -- headline
 
 end
+
+print('-------------   PROFILING   INFO   ----------------')
+print(string.format('%20s%10.2f%7s','total time',ggtime:time().real,''))

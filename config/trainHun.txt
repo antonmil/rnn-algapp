@@ -1,8 +1,8 @@
           model_index  1
-             rnn_size  512
-           num_layers  1
-                max_n  9
-                max_m  9
+             rnn_size  100
+           num_layers  6
+                max_n  7
+                max_m  7
               problem  quadratic
             inference  marginal
              solution  distribution
@@ -15,9 +15,9 @@
                
             init_from  
         training_file  
-           max_epochs  200000
+           max_epochs  20000
       mini_batch_size  10
-       synth_training  200
+       synth_training  10
           synth_valid  10
              full_set  0
 
@@ -43,7 +43,7 @@
           print_every  100
        eval_val_every  1000
            plot_every  1000
-              dropout  0.1
+              dropout  0.5
              temp_win  4
            suppress_x  0
               verbose  2
@@ -56,8 +56,8 @@
             real_data  0
             real_dets  0
           trim_tracks  0
-            grad_clip  1
-            lrng_rate  .005
+            grad_clip  .1
+            lrng_rate  .001
       lrng_rate_decay  0.95
 lrng_rate_decay_after  -1
          rand_par_rng  .08

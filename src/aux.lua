@@ -165,6 +165,7 @@ function readQBPData(ttmode)
   local ValProbTab, ValSolTab = {},{}
 
   local Qfile = string.format('%sdata/%s/Q_N%d_M%d',getRootDir(), ttmode, opt.max_n, opt.max_m);
+  checkFileExist(Qfile..'.mat','Q cost file')  
   local loaded = mattorch.load(Qfile..'.mat')
   local allQ = loaded.allQ:t() -- TODO why is it transposed?
 
@@ -173,10 +174,12 @@ function readQBPData(ttmode)
   local allSol = {}
   if opt.solution == 'integer' then
     Solfile = string.format('%sdata/%s/SolInt_N%d_M%d',getRootDir(), ttmode, opt.max_n, opt.max_m);
+    checkFileExist(Solfile..'.mat','solution file')
     local loaded = mattorch.load(Solfile..'.mat')
     allSol = loaded.allSolInt:t() -- TODO why is it transposed?
   elseif opt.solution == 'distribution' then
     Solfile = string.format('%sdata/%s/Sol_N%d_M%d',getRootDir(), ttmode, opt.max_n, opt.max_m);
+    checkFileExist(Solfile..'.mat','solution file')
     local loaded = mattorch.load(Solfile..'.mat')
     allSol = loaded.allSol:t() -- TODO why is it transposed?
   end
@@ -467,6 +470,7 @@ function printDebugValues(C, Pred)
     local HunAss = hungarianL(C)
     local marginals = getMarginals(C,solTable)
 
+    marginals = dataToCPU(marginals)
     local mmaxv, mmaxi = torch.max(marginals,2)
     mmaxv=mmaxv:reshape(N) mmaxi=mmaxi:reshape(N)
 
@@ -502,6 +506,7 @@ function printDebugValues(C, Pred)
     local HAcost = torch.sum(C:gather(2,HunAss:narrow(2,2,1):long():reshape(N,1)))
     local Marcost = torch.sum(C:gather(2,mmaxi:long():reshape(N,1)))
     local PMarcost = torch.sum(C:gather(2,pmmaxi:long():reshape(N,1)))
+
     local MMsum = torch.sum((mmaxi-pmmaxi):ne(0)) -- sum of wrong predictions
     --  print(NNcost,HAcost,Marcost,PMarcost)
     print(string.format('%5s%5.2f%5.2f%5.2f%5.2f%5d','Sum',NNcost,HAcost,Marcost,PMarcost,MMsum))
@@ -525,6 +530,8 @@ function printDebugValues(C, Pred)
     end
     
     sol=dataToCPU(sol)
+    
+    local diff = sol-Pred
 
     -- true solution
     local smaxv, smaxi = torch.max(sol,2)
@@ -536,16 +543,16 @@ function printDebugValues(C, Pred)
 
     if opt.inference == 'map' then
     print(string.format('%5s%5s%5s%5s%5s|%s|%s|%s','i','Sol','Mar','Pred','Err',
-      getDebugTableTitle('Cost'),getDebugTableTitle('Optim'),getDebugTableTitle('Predict')))
+      getDebugTableTitle('Diff'),getDebugTableTitle('Optim'),getDebugTableTitle('Predict')))
     elseif opt.inference=='marginal' then
-      print(string.format('%5s%5s%5s%5s%5s|%s|%s|%s','i','Sol','Mar','Pred','Err',
-        getDebugTableTitle('Cost'),getDebugTableTitle('Marginal'),getDebugTableTitle('Pred Marg')))
+      print(string.format('%5s%5s%5s%5s%5s|%s|%s|%s','i','Sol','Diff','Pred','Err',
+        getDebugTableTitle('Diff'),getDebugTableTitle('Marginal'),getDebugTableTitle('Pred Marg')))
     end
 
     for i=1,N do
       local prLine = ''
-      prLine = prLine .. string.format('%5d%5d%5d%5d%5d|',i,smaxi[i],smaxi[i],pmaxi[i],smaxi[i]-pmaxi[i])
-      for j=1,M do prLine = prLine ..  string.format('%8s','') end
+      prLine = prLine .. string.format('%5d%5d%5.1f%5d%5d|',i,smaxi[i],torch.sum(torch.abs(diff[i])),pmaxi[i],smaxi[i]-pmaxi[i])
+      for j=1,M do prLine = prLine ..  string.format('%8.4f',diff[i][j]) end
       prLine = prLine .. ' |'
       for j=1,M do prLine = prLine ..  string.format('%8.4f',sol[i][j]) end
       prLine = prLine .. ' |'
@@ -563,7 +570,7 @@ function printDebugValues(C, Pred)
     local predProb = evalSol(maxMargins, nil, C)
     local MMsum = torch.sum((smaxi-pmaxi):ne(0)) -- sum of wrong predictions
 
-    print(string.format('%5s%5.1f%5.1f%5.1f%5d|','Cost',solProb,0,predProb,MMsum))
+    print(string.format('%5s%5.1f%5.1f%5.1f%5d|','Cost',solProb,torch.sum(torch.abs(diff)),predProb,MMsum))
 
   end
 
@@ -595,4 +602,55 @@ function evalSol(sol, c, Q)
 
   local ret = c * sol + sol:t() * Q * sol
   return ret:squeeze()
+end
+
+function plotProgress(predictions,winID, winTitle)
+  local mm=0 -- number of mismatches
+  local logpredDA = decode(predictions):reshape(opt.mini_batch_size*opt.max_n,opt.nClasses):sub(1,opt.max_n)
+  local predDA=costToProb(-logpredDA)
+  local predAsTracks = predDA:reshape(opt.max_n, opt.max_m, 1)
+  
+  local hun = huns:sub(1,1)
+
+  eval_val_mm = 0
+  
+  local pmmaxv, pmmaxi = torch.max(predDA,2)
+  local cmtr = costs:sub(1,1)
+  --    print(cmtr)
+  if opt.problem == 'linear' then cmtr = cmtr:reshape(opt.max_n,opt.max_m)
+  elseif opt.problem == 'quadratic' then cmtr = cmtr:reshape(opt.max_n*opt.max_m,opt.max_n*opt.max_m)
+  end
+
+  printDebugValues(cmtr, predDA:reshape(opt.max_n, opt.max_m))
+
+  local sol = nil
+  if opt.inference == 'map' then
+    -- greedy
+    sol = hun:reshape(opt.max_n,1)
+    if opt.solution == 'distribution' then
+      local sv, si = torch.max(hun:reshape(opt.max_n, opt.max_m),2)
+      sol = si:clone()
+    end
+    mm = torch.sum(torch.abs(sol:float()-pmmaxi:float()):ne(0))
+  elseif opt.inference == 'marginal' then
+    -- marginals
+    --        local marginals = getMarginals(cmtr,solTable)
+    sol = hun:reshape(opt.max_n, opt.max_m)
+    local mmaxv, mmaxi = torch.max(sol,2)
+
+    mm = torch.sum(torch.abs(mmaxi-pmmaxi):ne(0))
+  end
+  sol=dataToCPU(sol)
+  predDA=dataToCPU(predDA)
+  if opt.solution == 'integer' then sol=getOneHotLab(sol, true) end
+  -- plot prob distributions
+  local plotTab = {}
+  gnuplot.raw('unset ytics')
+  plotTab = getPredPlotTab(plotTab, predDA, 1)
+  plotTab = getPredPlotTab(plotTab, sol, 2)
+  plot(plotTab, winID, winTitle)
+  gnuplot.raw('set ytics')
+
+  
+  return mm
 end

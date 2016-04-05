@@ -140,5 +140,7 @@ if opt.problem=='linear' then inpVec=inpVec:reshape(opt.max_n,opt.max_m)
 elseif opt.problem=='quadratic' then inpVec=inpVec:reshape(opt.max_n*opt.max_m,opt.max_n*opt.max_m)
 end
 
-printDebugValues(inpVec, predDA)
+--printDebugValues(inpVec, predDA)
+
+plotProgress(predictions,0,'Test')
 
