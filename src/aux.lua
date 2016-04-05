@@ -289,7 +289,8 @@ function computeMarginals(CostTab)
         end
 --        print(hypCost)
 --        print(torch.exp(-hypCost))
-        marginals[idx] = marginals[idx] + torch.exp(-hypCost)   -- add to joint matrix
+--        marginals[idx] = marginals[idx] + torch.exp(-hypCost)   -- add to joint matrix
+          marginals[idx] = marginals[idx] + torch.exp(hypCost)   -- add to joint matrix
       end
       
 --      print(marginals)
@@ -570,7 +571,7 @@ function printDebugValues(C, Pred)
     local predProb = evalSol(maxMargins, nil, C)
     local MMsum = torch.sum((smaxi-pmaxi):ne(0)) -- sum of wrong predictions
 
-    print(string.format('%5s%5.1f%5.1f%5.1f%5d|','Cost',solProb,torch.sum(torch.abs(diff)),predProb,MMsum))
+    print(string.format('%5s%5.1f%5.1f%5.1f%5d|','Sim',solProb,torch.sum(torch.abs(diff)),predProb,MMsum))
 
   end
 

@@ -33,10 +33,7 @@ sopt.model = sopt.model..'.t7'
 
 
 
-if not lfs.attributes(sopt.model, 'mode') then
-    print('Error: File ' .. sopt.model .. ' does not exist.?')
-    abort('...')
-end
+checkFileExist(sopt.model,'model file')
 if lfs.attributes('/home/h3/','mode') then sopt.suppress_x=1 end
 print('Loading model ... '..sopt.model)
 checkpoint = torch.load(sopt.model)
@@ -51,7 +48,7 @@ opt.gpuid=-1
 opt.synth_training, opt.synth_valid = 2,2
 
 init_state = getInitState(opt, miniBatchSize)
-solTable =  findFeasibleSolutions(opt.max_n, opt.max_m)
+solTable = nil
 
 pm('getting training/validation data...')
 if opt.problem == 'linear' then
@@ -67,6 +64,7 @@ ValCostTab = normalizeCost(ValCostTab)
 
 if opt.inference == 'marginal' then
   pm('Computing marginals...')
+  solTable =  findFeasibleSolutions(opt.max_n, opt.max_m)
   ValSolTab = computeMarginals(ValCostTab)
 end
 

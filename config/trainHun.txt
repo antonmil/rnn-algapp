@@ -1,6 +1,6 @@
           model_index  1
              rnn_size  100
-           num_layers  6
+           num_layers  3
                 max_n  7
                 max_m  7
               problem  quadratic
@@ -17,7 +17,7 @@
         training_file  
            max_epochs  20000
       mini_batch_size  10
-       synth_training  10
+       synth_training  100
           synth_valid  10
              full_set  0
 

@@ -1,9 +1,11 @@
 %% quadratic program data and solutions
 % first set parameters
 % problem size
-N=10;
+N=7;
 M=N;
 nTr = 100; % training batches
+maxSimThr = 0.8;
+sparseFactor = 0.2;
 A=zeros(M,N*M); Aeq=zeros(N, N*M);  % ineq and eq constr. matrices
 b=ones(M,1); beq=ones(N,1);         % ineq and eq constr. vectors
 act=1;
@@ -28,7 +30,7 @@ for ttm=ttmodes
     model.rhs = [b; beq];
     model.vtype = 'B'; % binary
     % model.vtype = 'C'; model.lb=0*ones(1,N*M); model.ub=1*ones(1,N*M); % relaxed
-    model.modelsense = 'min';
+    model.modelsense = 'max';
     model.sense = char( ['<' * ones(1, length(b)), '=' * ones(1,length(beq))]);
     clear params
     params.outputflag = 0;
@@ -66,25 +68,33 @@ for ttm=ttmodes
             Q = randn(N*M, N*M).^pot;
         end
         Q=real(Q);
+        
         Q=(Q' * Q); % Positive semi-definite
         
-        
+        Q = Q - min(Q(:));    % >= 0
+%         Q(Q>maxSimThr)=maxSimThr;           % max
+        Q = Q / max(Q(:));          % <= 1
+        %     Q = -Q;                     % negative semi-definite (because we are argmaxing)
+           
         for ii=1:N*M, Q(ii,ii)=0; end % set diag=0
         % only keep immediate neighbors
-        for ii=1:N
-            for jj=1:M
-                if abs(ii-jj)>1
-                    Qsub = sub2ind([N,N],jj,ii);
-                    Q(Qsub,:)=0;
-                    Q(:,Qsub)=0;
-                end
+%         for ii=1:N
+%             for jj=1:M
+%                 if abs(ii-jj)>1
+%                     Qsub = sub2ind([N,N],jj,ii);
+%                     Q(Qsub,:)=0;
+%                     Q(:,Qsub)=0;
+%                 end
+%             end
+%         end
+
+        for ii=1:N*M
+            if rand<sparseFactor
+                Q(ii,:)=0; Q(:,ii)=0;
             end
         end
-        
-        %     Q = Q - min(Q(:)) + eps;    % >= 0
-        %     Q = Q / max(Q(:));          % <= 1
-        %     Q = -Q;                     % negative semi-definite (because we are argmaxing)
-        
+        Q = Q / max(Q(:));          % <= 1        
+
         
         c = rand(1,N*M);            % linear weights
         

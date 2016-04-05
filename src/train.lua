@@ -196,11 +196,12 @@ end
 pm('   ...done',2)
 
 
------ gen data for Hungarian
-solTable =  findFeasibleSolutions(opt.max_n, opt.max_m) -- get feasible solutions
+
+solTable = nil
 
 pm('getting training/validation data...')
 if opt.problem == 'linear' then
+  ----- gen data for Hungarian
   --  if opt.inference == 'map' then
   TrCostTab,TrSolTab = genHunData(opt.synth_training)
   ValCostTab,ValSolTab = genHunData(opt.synth_valid)
@@ -221,6 +222,7 @@ ValCostTab = normalizeCost(ValCostTab)
 
 if opt.inference == 'marginal' then
   pm('Computing marginals...')
+  solTable =  findFeasibleSolutions(opt.max_n, opt.max_m) -- get feasible solutions
   TrSolTab = computeMarginals(TrCostTab)
   ValSolTab = computeMarginals(ValCostTab)
 end
