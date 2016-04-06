@@ -1,9 +1,9 @@
 %% quadratic program data and solutions
 % first set parameters
 % problem size
-N=7;
+N=9;
 M=N;
-nTr = 100; % training batches
+nTr = 1000; % training batches
 maxSimThr = 0.8;
 sparseFactor = 0.2;
 A=zeros(M,N*M); Aeq=zeros(N, N*M);  % ineq and eq constr. matrices
@@ -101,7 +101,9 @@ for ttm=ttmodes
         model.Q = sparse(Q); c(:)=0; % quadratic weights (c=0 means no unaries)
         model.obj = c;
         
-        result = gurobi(model, params); % run gurobi
+%         result = gurobi(model, params); % run gurobi
+        result.status = 'TIME_LIMIT';
+        result.x = zeros(N*M,1);result.x(1,1)=1;
         result.x(result.x>0.5)=1;
         result.x(result.x<=0.5)=0;
         

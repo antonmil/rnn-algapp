@@ -1,11 +1,11 @@
           model_index  1
              rnn_size  100
-           num_layers  3
-                max_n  7
-                max_m  7
-              problem  quadratic
-            inference  marginal
-             solution  distribution
+           num_layers  1
+                max_n  2
+                max_m  2
+              problem  linear
+            inference  map
+             solution  integer
             state_dim  4
            batch_size  1
             loss_type  1
@@ -15,7 +15,7 @@
                
             init_from  
         training_file  
-           max_epochs  20000
+           max_epochs  2000
       mini_batch_size  10
        synth_training  100
           synth_valid  10
@@ -40,9 +40,9 @@
           dummy_noise  0
            train_type  0
           
-          print_every  100
-       eval_val_every  1000
-           plot_every  1000
+          print_every  10
+       eval_val_every  100
+           plot_every  100
               dropout  0.5
              temp_win  4
            suppress_x  0
@@ -56,7 +56,7 @@
             real_data  0
             real_dets  0
           trim_tracks  0
-            grad_clip  .1
+            grad_clip  1
             lrng_rate  .001
       lrng_rate_decay  0.95
 lrng_rate_decay_after  -1

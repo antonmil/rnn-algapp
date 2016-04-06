@@ -219,7 +219,7 @@ end
 
 --------------------------------------------------------------------------
 --- Save checkpoint (convert to CPU first)
-function saveCheckpoint(savefile, tracks, detections, protos, opt, trainLosses, time, it)  
+function saveCheckpoint(savefile, tracks, detections, protos, opt, trainLosses, time, it, protosE)  
   savefile = savefile or string.format('%sbin/model.t7',getRootDir())
   print('saving model to ' .. savefile)
   local checkpoint = {}
@@ -229,7 +229,14 @@ function saveCheckpoint(savefile, tracks, detections, protos, opt, trainLosses, 
 
   local saveProtos = {}
   for k,v in pairs(protos) do saveProtos[k] = protos[k]:clone() end
-  for k,v in pairs(saveProtos) do saveProtos[k] = saveProtos[k]:float() end  
+  for k,v in pairs(saveProtos) do saveProtos[k] = saveProtos[k]:float() end
+  
+  local saveProtosE = {}
+  if protosE ~= nil then
+    for k,v in pairs(protosE) do saveProtosE[k] = protosE[k]:clone() end
+    for k,v in pairs(saveProtosE) do saveProtosE[k] = saveProtosE[k]:float() end
+    checkpoint.protosE = saveProtosE
+  end
   -- convert the networks to be CPU models
 --  for k,v in pairs(checkpoint.protos) do
 --    print('converting ' .. k .. ' to CPU')

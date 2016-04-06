@@ -82,10 +82,11 @@ function genHunData(nSamples)
     local hunSols = torch.ones(1,opt.max_n):int()
     for m=1,opt.mini_batch_size do
       local costMat = oneCost[m]:reshape(opt.max_n, opt.nClasses)
-      local ass = hungarianL(costMat)
+      local ass = hungarianL(-costMat) -- treat as similarity
       hunSols = hunSols:cat(ass[{{},{2}}]:reshape(1,opt.max_n):int(), 1)
     end
     hunSols=hunSols:sub(2,-1)
+    hunSols = dataToGPU(hunSols)
     table.insert(HunTab, hunSols)
   end
   return CostTab, HunTab
@@ -167,7 +168,7 @@ function readQBPData(ttmode)
   local Qfile = string.format('%sdata/%s/Q_N%d_M%d',getRootDir(), ttmode, opt.max_n, opt.max_m);
   checkFileExist(Qfile..'.mat','Q cost file')  
   local loaded = mattorch.load(Qfile..'.mat')
-  local allQ = loaded.allQ:t() -- TODO why is it transposed?
+  local allQ = loaded.allQ:t() -- transpose because Matlab is first-dim-major (https://groups.google.com/forum/#!topic/torch7/qDIoWnJzkcU)
 
 
   local Solfile = string.format('%sdata/%s/Sol_N%d_M%d',getRootDir(), ttmode, opt.max_n, opt.max_m);
@@ -176,12 +177,12 @@ function readQBPData(ttmode)
     Solfile = string.format('%sdata/%s/SolInt_N%d_M%d',getRootDir(), ttmode, opt.max_n, opt.max_m);
     checkFileExist(Solfile..'.mat','solution file')
     local loaded = mattorch.load(Solfile..'.mat')
-    allSol = loaded.allSolInt:t() -- TODO why is it transposed?
+    allSol = loaded.allSolInt:t() -- transpose because Matlab is first-dim-major
   elseif opt.solution == 'distribution' then
     Solfile = string.format('%sdata/%s/Sol_N%d_M%d',getRootDir(), ttmode, opt.max_n, opt.max_m);
     checkFileExist(Solfile..'.mat','solution file')
     local loaded = mattorch.load(Solfile..'.mat')
-    allSol = loaded.allSol:t() -- TODO why is it transposed?
+    allSol = loaded.allSol:t() -- transpose because Matlab is first-dim-major
   end
 
   allQ=allQ:float()
@@ -340,6 +341,23 @@ function normalizeCost(CostTab)
   return CostTab
 end
 
+-- insert tokens into costs
+function insertTokens(tab)
+  local extraColumn = torch.ones(opt.featmat_n,1) * -1
+  local TrCostTabT = {}
+  for k,v in pairs(tab) do
+    local newv = torch.zeros(opt.mini_batch_size, opt.inSize + opt.featmat_n) 
+    for mb=1,opt.mini_batch_size do
+      local c = dataToCPU(v[mb])
+      c = c:reshape(opt.featmat_n, opt.featmat_m)
+      c = c:cat(extraColumn, 2):reshape(1,opt.inSize + opt.featmat_n)
+      newv[mb] = c
+    end
+    TrCostTabT[k] = dataToGPU(newv)
+  end
+  return TrCostTabT
+end
+
 
 function findFeasibleSolutions(N,M)
   pm(string.format('Finding all feasible %d x %d assignments...',N,M))
@@ -426,6 +444,40 @@ function getRNNInput(t, rnn_state, predictions)
 end
 
 --------------------------------------------------------------------------
+--- get one input at a time
+-- @param t   time step
+-- @param rnn_state hidden state of RNN (use t-1)
+function getRNNEInput(t, rnn_state)
+  local rnninp = {}
+  
+  -- Cost matrix one entry at a time
+  local loccost = costsT:narrow(2,t,1)
+  table.insert(rnninp, loccost)
+
+  for i = 1,#rnn_state[t-1] do table.insert(rnninp,rnn_state[t-1][i]) end
+
+  return rnninp, rnn_state
+end
+
+--------------------------------------------------------------------------
+--- get decoder input
+-- @param t   time step
+-- @param rnn_state hidden state of RNN (use t-1)
+-- @param predictions current predictions to use for feed back
+function getRNNDInput(t, rnn_state, predictions)
+  local rnninp = {}
+
+  -- Cost matrix
+  local loccost = dataToGPU(torch.zeros(opt.mini_batch_size, 1))
+  --  loccost = probToCost(loccost)
+  table.insert(rnninp, loccost)
+
+  for i = 1,#rnn_state[t-1] do table.insert(rnninp,rnn_state[t-1][i]) end
+
+  return rnninp, rnn_state
+end
+
+--------------------------------------------------------------------------
 --- RNN decoder
 -- @param predictions current predictions to use for feed back
 -- @param t   time step (nil to predict for entire sequence)
@@ -446,7 +498,8 @@ function decode(predictions, tar)
 end
 
 function getDebugTableTitle(str)
-  local formatString = string.format('%%%ds',opt.max_m * 8+1)
+  if opt.max_m>10 then return str end
+  local formatString = string.format('%%%ds',opt.max_m * 5+1)
   return string.format(formatString, '--- '..str..' --- ')
 end
 
@@ -456,48 +509,73 @@ end
 -- @param C     The cost matrix
 -- @param Pred  Predicted values from LSTM
 function printDebugValues(C, Pred)
+  local N,M = opt.max_n, opt.max_m
+  local printMatrix = true
+  if N>10 or M>10 then printMatrix=false end
 
   --  local C = probToCost(C) -- negative log-probability (cost)
   --  local N,M = getDataSize(P)
   C=dataToCPU(C)
   Pred=dataToCPU(Pred)
-  local N,M = opt.max_n, opt.max_m
+  
+  
 
-  --  print('Cost matrix')
+  -- sol is the solution matrix (binary or distribution)
+  local sol = huns:sub(1,1)
+  if opt.solution=='integer' then sol=getOneHotLab(sol, true)
+  else sol=sol:reshape(N,M)
+  end  
+  sol=dataToCPU(sol)
+  
+  -- diff matrix sol and prediction
+  local diff = sol-Pred
+
+  -- true assignment solution (max row-wise)
+  local smaxv, smaxi = torch.max(sol,2)
+  smaxv=smaxv:reshape(N) smaxi=smaxi:reshape(N)
+
+  -- predicted assignment solution
+  local pmaxv, pmaxi = torch.max(Pred, 2)
+  pmaxv=pmaxv:reshape(N) pmaxi=pmaxi:reshape(N)
+
   if opt.problem == 'linear' then
     local minv, mini = torch.min(C,2)
     minv=minv:reshape(N) mini=mini:reshape(N)
 
     local HunAss = hungarianL(C)
-    local marginals = getMarginals(C,solTable)
+    
+--    local marginals = getMarginals(C,solTable)
+--
+--    marginals = dataToCPU(marginals)
+--    local smaxv, smaxi = torch.max(marginals,2)
+--    smaxv=smaxv:reshape(N) smaxi=smaxi:reshape(N)
+--
+--    local pmaxv, pmaxi = torch.max(Pred,2)
+--    pmaxv=pmaxv:reshape(N) pmaxi=pmaxi:reshape(N)
 
-    marginals = dataToCPU(marginals)
-    local mmaxv, mmaxi = torch.max(marginals,2)
-    mmaxv=mmaxv:reshape(N) mmaxi=mmaxi:reshape(N)
-
-    local pmmaxv, pmmaxi = torch.max(Pred,2)
-    pmmaxv=pmmaxv:reshape(N) pmmaxi=pmmaxi:reshape(N)
 
 
-
-    print(string.format('%5s%5s%5s%5s%5s%5s|%s|%s|%s','i','NN','HA','Mar','PMar','Err',
-      getDebugTableTitle('Cost'),getDebugTableTitle('Marg'),getDebugTableTitle('Predicted Marg')))
+    print(string.format('%5s%5s%5s%5s%5s%5s|%s|%s|%s','i','NN','HA','GT','Pred','Err',
+      getDebugTableTitle('Sim-ty'),getDebugTableTitle('GT'),getDebugTableTitle('Predicted')))
     for i=1,N do
       local prLine = ''
-      prLine = prLine .. string.format('%5d%5d%5d%5d%5d%5d|',i,mini[i],HunAss[i][2],mmaxi[i],pmmaxi[i],mmaxi[i]-pmmaxi[i])
+      prLine = prLine .. string.format('%5d%5d%5d%5d%5d%5d|',i,mini[i],HunAss[i][2],smaxi[i],pmaxi[i],smaxi[i]-pmaxi[i])
+      if printMatrix then
       for j=1,M do
         --      prLine = prLine ..  string.format('%8.4f',C[i][j])
-        prLine = prLine ..  string.format('%8.4f',C[i][j])
+        prLine = prLine ..  string.format('%5.2f',C[i][j])
       end
       prLine = prLine .. ' |'
       for j=1,M do
-        prLine = prLine ..  string.format('%8.4f',marginals[i][j])
+        if opt.solution=='integer' then prLine = prLine ..  string.format('%5d',sol[i][j])
+        else prLine = prLine ..  string.format('%5.2f',sol[i][j])
+        end
       end
       prLine = prLine .. ' |'
       for j=1,M do
-        prLine = prLine ..  string.format('%8.4f',Pred[i][j])
+        prLine = prLine ..  string.format('%5.2f',Pred[i][j])
       end
-
+      end
       --    prLine=prLine..'\n'
       print(prLine)
     end
@@ -505,12 +583,12 @@ function printDebugValues(C, Pred)
     --  print(mini:long():reshape(N,1))
     local NNcost = torch.sum(C:gather(2,mini:long():reshape(N,1)))
     local HAcost = torch.sum(C:gather(2,HunAss:narrow(2,2,1):long():reshape(N,1)))
-    local Marcost = torch.sum(C:gather(2,mmaxi:long():reshape(N,1)))
-    local PMarcost = torch.sum(C:gather(2,pmmaxi:long():reshape(N,1)))
+    local Marcost = torch.sum(C:gather(2,smaxi:long():reshape(N,1)))
+    local PMarcost = torch.sum(C:gather(2,pmaxi:long():reshape(N,1)))
 
-    local MMsum = torch.sum((mmaxi-pmmaxi):ne(0)) -- sum of wrong predictions
+    local MMsum = torch.sum((smaxi-pmaxi):ne(0)) -- sum of wrong predictions
     --  print(NNcost,HAcost,Marcost,PMarcost)
-    print(string.format('%5s%5.2f%5.2f%5.2f%5.2f%5d','Sum',NNcost,HAcost,Marcost,PMarcost,MMsum))
+    print(string.format('%5s%5.1f%5.1f%5.1f%5.1f%5d|','Sum',NNcost,HAcost,Marcost,PMarcost,MMsum))
   elseif opt.problem=='quadratic' then
     if N<4 and M<4 then
       print('QBP')
@@ -523,41 +601,24 @@ function printDebugValues(C, Pred)
       end
     end
 
-    local sol = huns:sub(1,1)
-    if opt.solution=='integer' then
-      sol=getOneHotLab(sol, true)
-    else
-      sol=sol:reshape(N,M)
-    end
-    
-    sol=dataToCPU(sol)
-    
-    local diff = sol-Pred
 
-    -- true solution
-    local smaxv, smaxi = torch.max(sol,2)
-    smaxv=smaxv:reshape(N) smaxi=smaxi:reshape(N)
 
-    -- predicted solution
-    local pmaxv, pmaxi = torch.max(Pred, 2)
-    pmaxv=pmaxv:reshape(N) pmaxi=pmaxi:reshape(N)
-
-    if opt.inference == 'map' then
     print(string.format('%5s%5s%5s%5s%5s|%s|%s|%s','i','Sol','Mar','Pred','Err',
-      getDebugTableTitle('Diff'),getDebugTableTitle('Optim'),getDebugTableTitle('Predict')))
-    elseif opt.inference=='marginal' then
-      print(string.format('%5s%5s%5s%5s%5s|%s|%s|%s','i','Sol','Diff','Pred','Err',
-        getDebugTableTitle('Diff'),getDebugTableTitle('Marginal'),getDebugTableTitle('Pred Marg')))
-    end
+      getDebugTableTitle('Diff'),getDebugTableTitle('GT'),getDebugTableTitle('Predict')))
+
 
     for i=1,N do
       local prLine = ''
       prLine = prLine .. string.format('%5d%5d%5.1f%5d%5d|',i,smaxi[i],torch.sum(torch.abs(diff[i])),pmaxi[i],smaxi[i]-pmaxi[i])
-      for j=1,M do prLine = prLine ..  string.format('%8.4f',diff[i][j]) end
+      for j=1,M do prLine = prLine ..  string.format('%5.2f',diff[i][j]) end
       prLine = prLine .. ' |'
-      for j=1,M do prLine = prLine ..  string.format('%8.4f',sol[i][j]) end
+      for j=1,M do 
+        if opt.solution=='integer' then prLine = prLine ..  string.format('%5d',sol[i][j])
+        else prLine = prLine ..  string.format('%5.2f',sol[i][j])
+        end 
+      end
       prLine = prLine .. ' |'
-      for j=1,M do prLine = prLine ..  string.format('%8.4f',Pred[i][j]) end
+      for j=1,M do prLine = prLine ..  string.format('%5.2f',Pred[i][j]) end
       print(prLine)
     end
 

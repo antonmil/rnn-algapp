@@ -13,7 +13,8 @@ torch.setdefaulttensortype('torch.FloatTensor')
 
 local model_utils = require 'util.model'    -- model specific utils
 require 'util.misc'   -- all the rest
-local RNN = require 'model.RNN'
+local RNNE = require 'model.RNNEncoder'
+local RNND = require 'model.RNNDecoder'
 
 -- project specific auxiliary functions
 require 'aux'
@@ -106,11 +107,19 @@ opt.inSize = opt.max_n * opt.nClasses -- input feature vector size (Linear Assig
 if opt.problem=='quadratic' then
   opt.inSize = opt.max_n*opt.max_m * opt.max_n*opt.max_m -- QBP
 end
+opt.rnn_size_encoder = opt.rnn_size
 
 opt.solSize = opt.max_n -- integer
 if opt.solution == 'distribution' then
   opt.solSize = opt.max_n*opt.max_m -- one hot (or full)
 end
+
+opt.featmat_n, opt.featmat_m = opt.max_n, opt.max_m
+if opt.problem == 'quadratic' then 
+  opt.featmat_n, opt.featmat_m = opt.max_n * opt.max_m, opt.max_n * opt.max_m
+end
+
+opt.TE = opt.featmat_n*(opt.featmat_m+1)
 
 
 --opt.outSize = opt.nClasses
@@ -131,33 +140,34 @@ dataParams={'synth_training','synth_valid','mini_batch_size',
   'max_n','max_m','state_dim','full_set','fixed_n',
   'temp_win','real_data','real_dets','trim_tracks'}
 
+-- create prototype for Encoder
+print('creating an encoder '..opt.model..' with ' .. opt.num_layers .. ' layers')
+protosE = {}
+protosE.rnn = RNNE.rnn(opt)
 
--- create prototype
-print('creating an '..opt.model..' with ' .. opt.num_layers .. ' layers')
-protos = {}
-protos.rnn = RNN.rnn(opt)
-local lambda = opt.lambda
+-- create prototype for Decoder
+print('creating a decoder '..opt.model..' with ' .. opt.num_layers .. ' layers')
+protosD = {}
+protosD.rnn = RNND.rnn(opt)
 local nllc = nn.ClassNLLCriterion()
-local bce = nn.BCECriterion()
-local mse = nn.MSECriterion()
-local abserr = nn.AbsCriterion()
 local kl = nn.DistKLDivCriterion()
-local mlm = nn.MultiLabelMarginCriterion()
-local mlsm = nn.MultiLabelSoftMarginCriterion()
-protos.criterion = nn.ParallelCriterion()
+protosD.criterion = nn.ParallelCriterion()
 if opt.solution == 'integer' then
-  protos.criterion:add(nllc, opt.lambda)
+  protosD.criterion:add(nllc, opt.lambda)
 elseif opt.solution == 'distribution' then
-  protos.criterion:add(kl, opt.lambda)
+  protosD.criterion:add(kl, opt.lambda)
 end
 
 
 ------- GRAPH -----------
 if not onNetwork() then
   print('Drawing Graph')
-  graph.dot(protos.rnn.fg, 'Forw', getRootDir()..'graph/RNNForwardGraph_AA')
-  graph.dot(protos.rnn.bg, 'Backw', getRootDir()..'graph/RNNBackwardGraph_AA')
+  graph.dot(protosE.rnn.fg, 'Forw', getRootDir()..'graph/RNNEForwardGraph_AA')
+  graph.dot(protosE.rnn.bg, 'Backw', getRootDir()..'graph/RNNEBackwardGraph_AA')
+  graph.dot(protosD.rnn.fg, 'Forw', getRootDir()..'graph/RNNDForwardGraph_AA')
+  graph.dot(protosD.rnn.bg, 'Backw', getRootDir()..'graph/RNNDBackwardGraph_AA')
 end
+
 -------------------------
 
 local itOffset = 0
@@ -165,17 +175,40 @@ local itOffset = 0
 init_state = getInitState(opt, opt.mini_batch_size)
 
 -- ship the model to the GPU if desired
-for k,v in pairs(protos) do v = dataToGPU(v) end
+for k,v in pairs(protosE) do v = dataToGPU(v) end
+for k,v in pairs(protosD) do v = dataToGPU(v) end
 
 
 -- put the above things into one flattened parameters tensor
-params, grad_params = model_utils.combine_all_parameters(protos.rnn)
+--paramsE, grad_paramsE = model_utils.combine_all_parameters(protosE.rnn)
+params, grad_params = model_utils.combine_all_parameters(protosE.rnn,protosD.rnn)
+--print(params:size())
+--abort()
 local do_random_init = true
-if do_random_init then params:uniform(-opt.rand_par_rng, opt.rand_par_rng) end
+if do_random_init then 
+--  paramsE:uniform(-opt.rand_par_rng, opt.rand_par_rng) 
+  params:uniform(-opt.rand_par_rng, opt.rand_par_rng)
+end
+--params=paramsE:cat(paramsD)
+--grad_params=grad_paramsE:cat(grad_paramsD)
+--params = paramsD:clone()
+--grad_params=grad_paramsD:clone()
+
 -- initialize the LSTM forget gates with slightly higher biases to encourage remembering in the beginning
 if opt.model == 'lstm' then
   for layer_idx = 1, opt.num_layers do
-    for _,node in ipairs(protos.rnn.forwardnodes) do
+    for _,node in ipairs(protosE.rnn.forwardnodes) do
+      if node.data.annotations.name == "i2h_" .. layer_idx then
+        print('setting forget gate biases to '..opt.forget_bias..' in LSTM layer ' .. layer_idx)
+        -- the gates are, in order, i,f,o,g, so f is the 2nd block of weights
+        node.data.module.bias[{{opt.rnn_size_encoder+1, 2*opt.rnn_size_encoder}}]:fill(opt.forget_bias)
+      end
+    end
+  end
+end
+if opt.model == 'lstm' then
+  for layer_idx = 1, opt.num_layers do
+    for _,node in ipairs(protosD.rnn.forwardnodes) do
       if node.data.annotations.name == "i2h_" .. layer_idx then
         print('setting forget gate biases to '..opt.forget_bias..' in LSTM layer ' .. layer_idx)
         -- the gates are, in order, i,f,o,g, so f is the 2nd block of weights
@@ -184,18 +217,23 @@ if opt.model == 'lstm' then
     end
   end
 end
-print('number of parameters in the model: ' .. params:nElement())
+
+
+--print('number of parameters in the encoder model: ' .. paramsE:nElement())
+--print('number of parameters in the decoder model: ' .. paramsD:nElement())
+print('number of parameters in the entire model : ' .. params:nElement())
 
 -- make a bunch of clones after flattening, as that reallocates memory
 pm('Cloning '..opt.max_n..' times...',2)
-clones = {}
-for name,proto in pairs(protos) do
-  print('\tcloning ' .. name)
-  clones[name] = model_utils.clone_many_times(proto, opt.max_n, not proto.parameters)
+clonesE, clonesD = {}, {}
+for name,proto in pairs(protosE) do
+  clonesE[name] = model_utils.clone_many_times(proto, opt.TE, not proto.parameters)
+end
+clonesD = {}
+for name,proto in pairs(protosD) do
+  clonesD[name] = model_utils.clone_many_times(proto, opt.max_n, not proto.parameters)
 end
 pm('   ...done',2)
-
-
 
 solTable = nil
 
@@ -227,14 +265,21 @@ if opt.inference == 'marginal' then
   ValSolTab = computeMarginals(ValCostTab)
 end
 
+-- insert tokens into costs
+pm('inserting tokens')
 
+TrCostTabT = insertTokens(TrCostTab)
+ValCostTabT = insertTokens(ValCostTab)
 
---
---print(TrSolTab[1])
---print(ValProbTab[1])
---print(ValSolTab[1])
+-- set all costs to 1
+--opt.inSize = 1 -- WARNING
+--for k,v in pairs(TrCostTab) do
+--  TrCostTab[k] = dataToGPU(torch.zeros(opt.mini_batch_size, opt.inSize))
+--end
+--for k,v in pairs(ValCostTab) do
+--  ValCostTab[k] = dataToGPU(torch.zeros(opt.mini_batch_size, opt.inSize))
+--end
 
---abort()
 
 function getGTDA(tar)
   local DA = nil
@@ -274,24 +319,39 @@ function eval_val()
   plotSeq=1
   for seq=1,tL do
     costs = ValCostTab[seq]:clone()
+    costsT = ValCostTabT[seq]:clone()
     huns = ValSolTab[seq]:clone()
 
     TRAINING = false
     ----- FORWARD ----
+    -- ENCODE  
     local initStateGlobal = clone_list(init_state)
-    local rnn_state = {[0] = initStateGlobal}
-    --   local predictions = {[0] = {[opt.updIndex] = detections[{{},{t}}]}}
+    local rnn_stateE = {[0] = initStateGlobal}
+    local TE = opt.TE
+    
+    
+    for t=1,TE do
+      clonesE.rnn[t]:training()
+      local rnninp, rnn_stateE = getRNNEInput(t, rnn_stateE)    -- get combined RNN input table
+      local lst = clonesE.rnn[t]:forward(rnninp) -- do one forward tick
+      rnn_stateE[t] = {}
+      for i=1,#init_state do table.insert(rnn_stateE[t], lst[i]) end -- extract the state, without output    
+    end
+
+
+  
+    local initStateGlobal = clone_list(init_state)
+    local rnn_state = {[0] = rnn_stateE[#rnn_stateE]}
     local predictions = {}
-    --     local loss = 0
     local DA = {}
 
     local GTDA = {}
 
 
     for t=1,T do
-      clones.rnn[t]:evaluate()      -- set flag for dropout
-      local rnninp, rnn_state = getRNNInput(t, rnn_state, predictions)    -- get combined RNN input table
-      local lst = clones.rnn[t]:forward(rnninp) -- do one forward tick
+      clonesD.rnn[t]:evaluate()      -- set flag for dropout
+      local rnninp, rnn_state = getRNNDInput(t, rnn_state, predictions)    -- get combined RNN input table
+      local lst = clonesD.rnn[t]:forward(rnninp) -- do one forward tick
       predictions[t] = lst
       --           print(lst)
       --           abort()
@@ -302,7 +362,7 @@ function eval_val()
       --     print(DA[t])
       local input, output = getPredAndGTTables(DA[t], t)
 
-      local tloss = clones.criterion[t]:forward(input, output)
+      local tloss = clonesD.criterion[t]:forward(input, output)
 
       loss = loss + tloss
     end
@@ -326,6 +386,9 @@ end
 
 seqCnt=0
 function feval()
+--  grad_paramsE:zero()
+--  print(grad_paramsE[1])
+--  grad_paramsD:zero()
   grad_params:zero()
 
   local tL = tabLen(TrCostTab)
@@ -336,24 +399,42 @@ function feval()
 
   --  randSeq = math.random(tL) -- pick a random sequence from training set
   costs = TrCostTab[randSeq]:clone()
+  costsT = TrCostTabT[randSeq]:clone()
   huns = TrSolTab[randSeq]:clone()
 
   TRAINING = true
-  ----- FORWARD ----
+  local rnninp = nil
   local initStateGlobal = clone_list(init_state)
-  local rnn_state = {[0] = initStateGlobal}
-  --   local predictions = {[0] = {[opt.updIndex] = detections[{{},{t}}]}}
+  ----- FORWARD ----
+  -- ENCODE    
+  local rnn_stateE = {[0] = initStateGlobal}
+  local TE = opt.TE
+  
+  
+  for t=1,TE do
+    clonesE.rnn[t]:training()
+    rnninp, rnn_stateE = getRNNEInput(t, rnn_stateE)    -- get combined RNN input table
+    local lst = clonesE.rnn[t]:forward(rnninp) -- do one forward tick
+    rnn_stateE[t] = {}
+    for i=1,#init_state do table.insert(rnn_stateE[t], lst[i]) end -- extract the state, without output    
+  end
+
+    
+  -- DECODE
   local predictions = {}
   local loss = 0
   local DA = {}
   local T = opt.max_n
   local GTDA = {}
-  local rnninp = nil
 
+  local rnn_state = {[0] = rnn_stateE[#rnn_stateE]}
+--  local rnn_state = {[0] = initStateGlobal}
+--  print(rnn_state[0][1][1][1])
+  
   for t=1,T do
-    clones.rnn[t]:training()      -- set flag for dropout
-    rnninp, rnn_state = getRNNInput(t, rnn_state, predictions)    -- get combined RNN input table
-    local lst = clones.rnn[t]:forward(rnninp) -- do one forward tick
+    clonesD.rnn[t]:training()      -- set flag for dropout
+    rnninp, rnn_state = getRNNDInput(t, rnn_state, predictions)    -- get combined RNN input table
+    local lst = clonesD.rnn[t]:forward(rnninp) -- do one forward tick
     predictions[t] = lst
     --         print(lst)
     --         abort()
@@ -362,48 +443,36 @@ function feval()
     rnn_state[t] = {}
     for i=1,#init_state do table.insert(rnn_state[t], lst[i]) end -- extract the state, without output
     DA[t] = decode(predictions, t)
-    --         print(DA[t])
-    --         abort()
     local input, output = getPredAndGTTables(DA[t], t)
---        print(input[1])
---        print(output[1])
-    --    abort()
 
-    local tloss = clones.criterion[t]:forward(input, output)
+    local tloss = clonesD.criterion[t]:forward(input, output)
     loss = loss + tloss
-    --    print(tloss)
-    --    abort()
   end
   loss = loss / T -- make average over all frames
   local predDA = decode(predictions)
-  --   if opt.mini_batch_size>1 then predDA=predDA:sub(1,opt.max_n) end
 
-
-  -- plotting
-  -- plotting
   if (globiter == 1) or (globiter % opt.plot_every == 0) then
     print('Training checkpoint')
     feval_mm = plotProgress(predictions,1,'Train')
-    --    feval_mm = getDAErrorHUN(predDA:reshape(opt.max_n,1,opt.nClasses), hun:reshape(opt.max_n,1))
   end
 
 
   ------ BACKWARD ------
-  local rnn_backw = {}
   -- gradient at final frame is zero
   local drnn_state = {[T] = clone_list(init_state, true)} -- true = zero the clones
   for t=T,1,-1 do
     local input, output = getPredAndGTTables(DA[t], t)
-    local dl = clones.criterion[t]:backward(input,output)
+    local dl = clonesD.criterion[t]:backward(input,output)
     local nGrad = #dl
 
     for dd=1,nGrad do
       table.insert(drnn_state[t], dl[dd]) -- gradient of loss at time t
     end
 
-    local rnninp = getRNNInput(t, rnn_state, predictions)    -- get combined RNN input table
+    local rnninp = getRNNDInput(t, rnn_state, predictions)    -- get combined RNN input table
 
-    dlst = clones.rnn[t]:backward(rnninp, drnn_state[t])
+
+    local dlst = clonesD.rnn[t]:backward(rnninp, drnn_state[t])
 
     drnn_state[t-1] = {}
     local maxk = opt.num_layers+1
@@ -415,14 +484,36 @@ function feval()
         drnn_state[t-1][k-1] = v
       end
     end
-    -- TODO transfer final state?    
-
   end
-  grad_params:clamp(-opt.grad_clip, opt.grad_clip)
   
+  -- BACKWARDS ENCODER
+  local drnn_stateE = {[TE] = drnn_state[0], true} -- true = zero the clones
+  for t=TE,1,-1 do
+    local rnninp = getRNNEInput(t, rnn_stateE)    -- get combined RNN input table
+   
+    local dlst = clonesE.rnn[t]:backward(rnninp, drnn_stateE[t])
+
+    drnn_stateE[t-1] = {}
+    local maxk = opt.num_layers+1
+    if opt.model == 'lstm' then maxk = 2*opt.num_layers+1 end
+    for k,v in pairs(dlst) do
+      if k > 1 and k <= maxk then -- k == 1 is gradient on x, which we dont need
+        -- note we do k-1 because first item is dembeddings, and then follow the
+        -- derivatives of the state, starting at index 2. I know...
+        drnn_stateE[t-1][k-1] = v
+      end
+    end
+        
+  end
+  
+
   --   feval_mm = 0
   feval_multass = 0
---  print(grad_params[1])
+--  print(grad_paramsE[1])
+--  print(grad_paramsD[1])
+--  grad_params = grad_paramsE:cat(grad_paramsD)
+--  grad_params = grad_paramsD:clone()
+  grad_params:clamp(-opt.grad_clip, opt.grad_clip)
 
   return loss, grad_params
 
@@ -445,6 +536,7 @@ for i = 1, opt.max_epochs do
   globiter = i
 
   local timer = torch.Timer()
+
   local _, loss = optim.rmsprop(feval, params, optim_state)
   local time = timer:time().real
 
@@ -537,7 +629,7 @@ for i = 1, opt.max_epochs do
 
     -- save checkpt
     local savefile = getCheckptFilename(modelName, opt, modelParams)
-    saveCheckpoint(savefile, tracks, detections, protos, opt, train_losses, glTimer:time().real, i)
+    saveCheckpoint(savefile, tracks, detections, protosD, opt, train_losses, glTimer:time().real, i, protosE)
 
 
     --       os.execute("th rnnTrackerY.lua -model_name testingY -model_sign r50_l2_n3_m3_d2_b1_v0_li1 -suppress_x 0 -length 5 -seq_name TUD-Crossing")
@@ -546,15 +638,7 @@ for i = 1, opt.max_epochs do
       pm('*** New min. validation loss found! ***',2)
       local fn, dir, base, signature, ext = getCheckptFilename(modelName, opt, modelParams)
       local savefile  = dir .. base .. '_' .. signature .. '_val' .. ext
-      saveCheckpoint(savefile, tracks, detections, protos, opt, train_losses, glTimer:time().real, i)
-    end
-
-    -- save lowest val if necessary
-    if real_loss <= torch.min(plot_real_loss) then
-      pm('### New min. REAL loss found! ###',2)
-      local fn, dir, base, signature, ext = getCheckptFilename(modelName, opt, modelParams)
-      local savefile  = dir .. base .. '_' .. signature .. '_real' .. ext
-      saveCheckpoint(savefile, tracks, detections, protos, opt, train_losses, glTimer:time().real, i)
+      saveCheckpoint(savefile, tracks, detections, protosD, opt, train_losses, glTimer:time().real, i, protosE)
     end
 
     -- plot
