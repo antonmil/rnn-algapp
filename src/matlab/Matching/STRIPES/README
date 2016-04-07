@@ -1,0 +1,7 @@
+- To run STRIPES, you will first need to install:
+1. glpk for Matlab or CPLEX (for solving LP primal)                                           
+2. Matlab sparse cell class: http://cyanover.fhcrc.org/sparse_cell_2.tgz
+
+- To start running STRIPES, use:
+test_gnbest.m
+which allows you to run STRIPES on randomly generated graphs of various classes
