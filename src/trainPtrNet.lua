@@ -95,31 +95,17 @@ createAuxDirs()
 
 
 -- augment and fix opt --
-opt.model = string.lower(opt.model) -- make model name lower case
-opt.inference = string.lower(opt.inference)
-if string.find(opt.inference,'marg')~=nil then opt.inference='marginal' end
-opt.model_index=1
-if opt.model=='gru' then opt.model_index=2; end
-if opt.model=='rnn' then opt.model_index=3; end
-opt.nClasses = opt.max_m
+opt = fixOpt(opt)
 
-opt.inSize = opt.max_n * opt.nClasses -- input feature vector size (Linear Assignment)
-if opt.problem=='quadratic' then
-  opt.inSize = opt.max_n*opt.max_m * opt.max_n*opt.max_m -- QBP
-end
+-- seq-to-seq specific
+opt.nClasses=1
 opt.rnn_size_encoder = opt.rnn_size
-
-opt.solSize = opt.max_n -- integer
-if opt.solution == 'distribution' then
-  opt.solSize = opt.max_n*opt.max_m -- one hot (or full)
-end
-
 opt.featmat_n, opt.featmat_m = opt.max_n, opt.max_m
 if opt.problem == 'quadratic' then 
   opt.featmat_n, opt.featmat_m = opt.max_n * opt.max_m, opt.max_n * opt.max_m
 end
 
-opt.TE = opt.featmat_n*(opt.featmat_m+1)
+opt.TE = opt.featmat_n*(opt.featmat_m)
 
 
 --opt.outSize = opt.nClasses
@@ -151,11 +137,14 @@ protosD = {}
 protosD.rnn = RNND.rnn(opt)
 local nllc = nn.ClassNLLCriterion()
 local kl = nn.DistKLDivCriterion()
+local mse = nn.MSECriterion()
 protosD.criterion = nn.ParallelCriterion()
 if opt.solution == 'integer' then
-  protosD.criterion:add(nllc, opt.lambda)
+--  protosD.criterion:add(nllc, opt.lambda)
+  protosD.criterion:add(mse, opt.lambda)
 elseif opt.solution == 'distribution' then
-  protosD.criterion:add(kl, opt.lambda)
+--  protosD.criterion:add(kl, opt.lambda)
+  protosD.criterion:add(mse, opt.lambda)
 end
 
 
@@ -231,7 +220,7 @@ for name,proto in pairs(protosE) do
 end
 clonesD = {}
 for name,proto in pairs(protosD) do
-  clonesD[name] = model_utils.clone_many_times(proto, opt.max_n, not proto.parameters)
+  clonesD[name] = model_utils.clone_many_times(proto, opt.TE, not proto.parameters)
 end
 pm('   ...done',2)
 
@@ -243,6 +232,7 @@ if opt.problem == 'linear' then
   --  if opt.inference == 'map' then
   TrCostTab,TrSolTab = genHunData(opt.synth_training)
   ValCostTab,ValSolTab = genHunData(opt.synth_valid)
+  
   --  elseif opt.inference == 'marginal' then
   --    TrCostTab,TrSolTab = genMarginalsData(opt.synth_training)
   --    ValCostTab,ValSolTab = genMarginalsData(opt.synth_valid)
@@ -267,9 +257,14 @@ end
 
 -- insert tokens into costs
 pm('inserting tokens')
-
 TrCostTabT = insertTokens(TrCostTab)
 ValCostTabT = insertTokens(ValCostTab)
+
+--if opt.solution == 'integer' then
+--  -- convert to one hot
+--  TrSolTab = oneHotAll(TrSolTab)
+--  ValSolTab = oneHotAll(ValSolTab)
+--end
 
 -- set all costs to 1
 --opt.inSize = 1 -- WARNING
@@ -285,14 +280,20 @@ function getGTDA(tar)
   local DA = nil
 
 
-  if opt.solution == 'integer' then
-    -- integer
-    DA = huns[{{},{tar}}]:reshape(opt.mini_batch_size)
-  elseif opt.solution == 'distribution' then
-    -- one hot (or full prob distr.)
-    local offset = opt.max_n * (tar-1)+1
-    DA = huns[{{},{offset, offset+opt.max_n-1}}]
-  end
+--  if opt.solution == 'integer' then
+--    -- integer
+--    DA = huns[{{},{tar}}]:reshape(opt.mini_batch_size)
+----    print(DA)
+----    abort()
+--  elseif opt.solution == 'distribution' then
+--    -- one hot (or full prob distr.)    
+--    local offset = opt.max_n * (tar-1)+1
+--    DA = huns[{{},{offset, offset+opt.max_n-1}}]
+--  end
+  
+--  print(huns)
+--  print(tar)
+  DA = huns[{{},{tar}}]:reshape(opt.mini_batch_size)
 
   return DA
 end
@@ -314,7 +315,7 @@ function eval_val()
 
   local tL = tabLen(ValCostTab)
   local loss = 0
-  local T = opt.max_n
+  local T = opt.TE
   local plotSeq = math.random(tL)
   plotSeq=1
   for seq=1,tL do
@@ -328,6 +329,7 @@ function eval_val()
     local initStateGlobal = clone_list(init_state)
     local rnn_stateE = {[0] = initStateGlobal}
     local TE = opt.TE
+    
     
     
     for t=1,TE do
@@ -370,7 +372,7 @@ function eval_val()
 
     if seq==plotSeq then
       print('Validation checkpoint')
-      eval_val_mm = plotProgress(predictions,3,'Validation')
+      eval_val_mm = plotProgressD(predictions,3,'Validation')
     end
 
     --         eval_val_mm = 0
@@ -427,7 +429,8 @@ function feval()
   local predictions = {}
   local loss = 0
   local DA = {}
-  local T = opt.max_n
+--  local T = opt.max_n
+  local T = opt.TE
   local GTDA = {}
 
   local rnn_state = {[0] = rnn_stateE[#rnn_stateE]}
@@ -456,7 +459,7 @@ function feval()
 
   if (globiter == 1) or (globiter % opt.plot_every == 0) then
     print('Training checkpoint')
-    feval_mm = plotProgress(predictions,1,'Train')
+    feval_mm = plotProgressD(predictions,1,'Train')
   end
 
 

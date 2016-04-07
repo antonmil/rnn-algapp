@@ -1,9 +1,8 @@
           model_index  1
-             rnn_size  100
+             rnn_size  128
            num_layers  1
-                max_n  2
-                max_m  2
-              problem  linear
+                max_n  8
+              problem  quadratic
             inference  map
              solution  integer
             state_dim  4
@@ -15,9 +14,9 @@
                
             init_from  
         training_file  
-           max_epochs  20000
+           max_epochs  200000
       mini_batch_size  10
-       synth_training  100
+       synth_training  1000
           synth_valid  10
              full_set  0
 
@@ -43,7 +42,7 @@
           print_every  100
        eval_val_every  1000
            plot_every  1000
-              dropout  0.1
+              dropout  0.5
              temp_win  4
            suppress_x  0
               verbose  2
@@ -65,5 +64,5 @@ lrng_rate_decay_after  -1
            decay_rate  0.97
                  seed  1
                opencl  0
-                gpuid  -1
+                gpuid  0
                 

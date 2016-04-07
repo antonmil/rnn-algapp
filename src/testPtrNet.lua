@@ -50,27 +50,18 @@ opt.mini_batch_size = 1
 opt.gpuid=-1
 opt.synth_training, opt.synth_valid = 2,2
 
-opt.max_n=3
+opt.max_n=2
 opt.max_m=opt.max_n
-opt.nClasses = opt.max_m
-
-opt.inSize = opt.max_n * opt.nClasses -- input feature vector size (Linear Assignment)
-if opt.problem=='quadratic' then
-  opt.inSize = opt.max_n*opt.max_m * opt.max_n*opt.max_m -- QBP
-end
+fixOpt(opt)
+-- seq-to-seq specific
+opt.nClasses=1
 opt.rnn_size_encoder = opt.rnn_size
-
-opt.solSize = opt.max_n -- integer
-if opt.solution == 'distribution' then
-  opt.solSize = opt.max_n*opt.max_m -- one hot (or full)
-end
-
 opt.featmat_n, opt.featmat_m = opt.max_n, opt.max_m
 if opt.problem == 'quadratic' then 
   opt.featmat_n, opt.featmat_m = opt.max_n * opt.max_m, opt.max_n * opt.max_m
 end
 
-opt.TE = opt.featmat_n*(opt.featmat_m+1)
+opt.TE = opt.featmat_n*(opt.featmat_m)
 
 
 init_state = getInitState(opt, miniBatchSize)
@@ -132,14 +123,13 @@ local predictions = {}
 local loss = 0
 local DA = {}
 local T = opt.max_n
+local T = opt.TE
 local GTDA = {}
-
-
 
 
 for t=1,T do
 --   clones.rnn[t]:evaluate()     -- set flag for dropout
-  local rnninp, rnn_state = getRNNDInput(t, rnn_state, predictions)    -- get combined RNN input table
+  local rnninp, rnn_state = getRNNDInput(t, rnn_state, predictions, rnn_stateE)    -- get combined RNN input table
 --  print(rnninp)
   local lst = protosD.rnn:forward(rnninp)  -- do one forward tick
   predictions[t] = lst
@@ -148,26 +138,15 @@ for t=1,T do
 
   rnn_state[t] = {}
   for i=1,#init_state do table.insert(rnn_state[t], lst[i]) end -- extract the state, without output
-  print(predictions)
-  DA[t] = decode(predictions, t)
+--  print(predictions)
+--  DA[t] = decode(predictions, t)
 
 end
 
 
-local predDA = decode(predictions):reshape(opt.max_n,opt.nClasses)
-predDA=costToProb(-predDA)
+--local predDA = decode(predictions):reshape(opt.max_n,opt.nClasses)
+--predDA=costToProb(-predDA)
 
-
---local costs = torch.rand(3,3)
---print(opt.inSize)
---print(predDA)
---print(probToCost(predDA))
-local inpVec = costs:clone()
-if opt.problem=='linear' then inpVec=inpVec:reshape(opt.max_n,opt.max_m)
-elseif opt.problem=='quadratic' then inpVec=inpVec:reshape(opt.max_n*opt.max_m,opt.max_n*opt.max_m)
-end
-
---printDebugValues(inpVec, predDA)
-
-plotProgress(predictions,0,'Test')
+--print(predictions)
+plotProgressD(predictions,0,'Test')
 

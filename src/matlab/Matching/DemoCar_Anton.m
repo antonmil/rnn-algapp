@@ -23,7 +23,7 @@ BaBoptions.MaxIter = 50;
 BaBoptions.bpoptions = bpoptions;
 
 %% Mbest parameters
-param.mbest=50;
+param.mbest=5;
 param.chck_sols=1;
 
 

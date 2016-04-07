@@ -1577,18 +1577,19 @@ end
 --- Returns a one-hot encoding of a label vector for one frame
 -- @param lab			label (data association) vector for one frame
 -- @param singleBatch	single- or mult-batch switch
-function getOneHotLab(lab, singleBatch)
+function getOneHotLab(lab, singleBatch, nClasses)
   
-  local eye = torch.eye(opt.nClasses)
+  nClasses = nClasses or opt.nClasses
+  
+  local eye = torch.eye(nClasses)
   if singleBatch then
     
     local ind = lab:long():reshape(opt.max_n)
---     print(ind)
     local labOne = eye:index(1,ind)
   --   labOne = pad
     return dataToGPU(labOne)
   else
-    local labs = torch.zeros(1,opt.nClasses)
+    local labs = torch.zeros(1,nClasses)
     for mb=1,opt.mini_batch_size do 
       local mbStartT = opt.max_n * (mb-1)+1
       local mbEndT =   opt.max_n * mb

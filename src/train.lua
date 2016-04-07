@@ -94,23 +94,7 @@ createAuxDirs()
 
 
 -- augment and fix opt --
-opt.model = string.lower(opt.model) -- make model name lower case
-opt.inference = string.lower(opt.inference)
-if string.find(opt.inference,'marg')~=nil then opt.inference='marginal' end
-opt.model_index=1
-if opt.model=='gru' then opt.model_index=2; end
-if opt.model=='rnn' then opt.model_index=3; end
-opt.nClasses = opt.max_m
-
-opt.inSize = opt.max_n * opt.nClasses -- input feature vector size (Linear Assignment)
-if opt.problem=='quadratic' then
-  opt.inSize = opt.max_n*opt.max_m * opt.max_n*opt.max_m -- QBP
-end
-
-opt.solSize = opt.max_n -- integer
-if opt.solution == 'distribution' then
-  opt.solSize = opt.max_n*opt.max_m -- one hot (or full)
-end
+opt = fixOpt(opt)
 
 
 --opt.outSize = opt.nClasses
@@ -202,13 +186,8 @@ solTable = nil
 pm('getting training/validation data...')
 if opt.problem == 'linear' then
   ----- gen data for Hungarian
-  --  if opt.inference == 'map' then
   TrCostTab,TrSolTab = genHunData(opt.synth_training)
   ValCostTab,ValSolTab = genHunData(opt.synth_valid)
-  --  elseif opt.inference == 'marginal' then
-  --    TrCostTab,TrSolTab = genMarginalsData(opt.synth_training)
-  --    ValCostTab,ValSolTab = genMarginalsData(opt.synth_valid)
-  --  end
 elseif opt.problem == 'quadratic' then
   TrCostTab,TrSolTab,ValCostTab,ValSolTab = readQBPData('train')
 end
@@ -226,7 +205,7 @@ if opt.inference == 'marginal' then
   TrSolTab = computeMarginals(TrCostTab)
   ValSolTab = computeMarginals(ValCostTab)
 end
-
+--abort()
 
 
 --

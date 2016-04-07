@@ -68,14 +68,21 @@ if opt.inference == 'marginal' then
   ValSolTab = computeMarginals(ValCostTab)
 end
 
-
+------ try real data
+   local Qfile = string.format('%sdata/test',getRootDir());
+  checkFileExist(Qfile..'.mat','Q cost file')  
+  local loaded = mattorch.load(Qfile..'.mat')
+  local allQ = loaded.allQ:t() -- transpose because Matlab is first-dim-major (https://groups.google.com/forum/#!topic/torch7/qDIoWnJzkcU)
+  allQ=allQ:float()
+  ValCostTab[1]=allQ:reshape(1,opt.inSize)
+  ValSolTab[1] =torch.linspace(1,opt.max_n,opt.max_n):reshape(1,opt.max_n) 
 
 --if opt.problem == 'linear' then
 --  ValProbTab,ValSolTab = genHunData(1)
 --elseif opt.problem == 'quadratic' then
 --  _,_,ValProbTab,ValSolTab = readQBPData('test')
 --end
-local nthSample=2
+local nthSample=1
 
 
 

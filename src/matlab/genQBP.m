@@ -1,8 +1,9 @@
 %% quadratic program data and solutions
 % first set parameters
 % problem size
-N=9;
+N=4;
 M=N;
+mb = 10; % minibatch size
 nTr = 1000; % training batches
 maxSimThr = 0.8;
 sparseFactor = 0.2;
@@ -19,9 +20,11 @@ for j=1:M
 end
 
 ttmodes = {'train','test'};
+% ttmodes = {'train'};
 
 for ttm=ttmodes
     ttmode = char(ttm);
+    setTime = tic;
     % ttmode = 'test';
     
     % set up model for gurobi
@@ -34,11 +37,10 @@ for ttm=ttmodes
     model.sense = char( ['<' * ones(1, length(b)), '=' * ones(1,length(beq))]);
     clear params
     params.outputflag = 0;
-    params.TimeLimit = .1; % time limit in seconds
+    params.TimeLimit = 1; % time limit in seconds
     
     
     %%% How many samples do we want?
-    mb = 10; % minibatch size
     nTrainingSamples = nTr + mb;  % the +mb is for validation set
     nSamples = nTrainingSamples * mb;
     if strcmp(ttmode,'test'), nSamples=10; end
@@ -51,15 +53,14 @@ for ttm=ttmodes
     allSol = zeros(nSamples, N*M);
     allc = zeros(nSamples, N*M);
     allSolInt = zeros(nSamples, N);
+    allSolTimes = zeros(nSamples, 1);
     optres=false(nSamples,1);
     
-    for n=1:nSamples
-        if ~mod(n,round(nSamples/printDot))
-            fprintf('%.2f %%\n',n/nSamples*100);
-            
-            %         surf(Q); view(2); colorbar; drawnow;
-            %         HeatMap(Q);drawnow;
-        end
+    n=0;
+    while n<nSamples
+%         n
+%     for n=1:nSamples
+
         
         % generate random prob
         pot = rand*2;
@@ -76,7 +77,7 @@ for ttm=ttmodes
         Q = Q / max(Q(:));          % <= 1
         %     Q = -Q;                     % negative semi-definite (because we are argmaxing)
            
-        for ii=1:N*M, Q(ii,ii)=0; end % set diag=0
+%         for ii=1:N*M, Q(ii,ii)=0; end % set diag=0
         % only keep immediate neighbors
 %         for ii=1:N
 %             for jj=1:M
@@ -101,9 +102,13 @@ for ttm=ttmodes
         model.Q = sparse(Q); c(:)=0; % quadratic weights (c=0 means no unaries)
         model.obj = c;
         
-%         result = gurobi(model, params); % run gurobi
-        result.status = 'TIME_LIMIT';
-        result.x = zeros(N*M,1);result.x(1,1)=1;
+        result = gurobi(model, params); % run gurobi
+        if ~strcmpi(result.status,'optimal')
+            continue;
+        end
+        n=n+1;
+%         result.status = 'TIME_LIMIT';
+%         result.x = zeros(N*M,1);result.x(1,1)=1;
         result.x(result.x>0.5)=1;
         result.x(result.x<=0.5)=0;
         
@@ -111,14 +116,22 @@ for ttm=ttmodes
         allQ(n,:) = Q(:)'; % WARNING. IS THIS CORRECT INDEXING FOR NON_SYMM MATRICES?
         allc(n,:) = c;
         allSol(n,:) = result.x';        
+        allSolTimes(n,1) = result.runtime;
         [u,v]=find(reshape(result.x,N,M));
         allSolInt(n,:)=u';
         if strcmpi(result.status,'optimal')
             optres(n,1)=1;
         end
+        if ~mod(n,round(nSamples/printDot))
+            fprintf('%.2f %%\n',n/nSamples*100);
+            %         surf(Q); view(2); colorbar; drawnow;
+            %         HeatMap(Q);drawnow;
+        end        
     end
     
     fprintf('Optimal solutions found: %d / %d (= %.1f %%)\n',numel(find(optres)),nSamples,numel(find(optres))/nSamples*100);
+    fprintf('Avg. runtime per solution: %.2f sec\n',mean(allSolTimes));
+    fprintf('Total runtime: %.1f sec\n',toc(setTime));
     
     
     %% write out

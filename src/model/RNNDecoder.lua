@@ -38,7 +38,7 @@ function RNN.rnn(opt)
   local eOffset = #inputs  
   -- input encoders hidden states
 --  for t=1,opt.TE do
-  table.insert(inputs, nn.Identity()())
+--  table.insert(inputs, nn.Identity()())
 --  end
   
     
@@ -94,53 +94,55 @@ function RNN.rnn(opt)
 
   if dropout > 0 then top_DA_state = nn.Dropout(dropout)(top_DA_state) end
 
---  local da = nn.Linear(opt.rnn_size, opt.nClasses)(top_DA_state):annotate{
---    name='DA_t',
---    description='data assoc.',
---    graphAttributes = {color='green', style='filled'}
---  }
---  local localDaRes = nn.Reshape(opt.nClasses, batchMode)(da):annotate{name='Rshp DA'}
---  local daFinal = localDaRes
---
+  local da = nn.Linear(opt.rnn_size, 1)(top_DA_state):annotate{
+    name='DA_t',
+    description='data assoc.',
+    graphAttributes = {color='green', style='filled'}
+  }
+  local localDaRes = nn.Reshape(1, batchMode)(da):annotate{name='Rshp DA'}
+  local daFinal = nn.Sigmoid()(localDaRes)
+
 --  daFinal = nn.LogSoftMax()(localDaRes):annotate{
 --    name='DA_t',
 --    description='data assoc. LogSoftMax',
 --    graphAttributes = {color='green'}
 --  }
 
+
   --- construct output out of encoder inputs  
-  local W2di = nn.Linear(opt.rnn_size, opt.rnn_size)(top_DA_state) -- W2*di
-  allEs = inputs[eOffset+1]
---  print(allEs)
---  local oneS =nn.SelectTable(1)(allEs)
---  oneS =nn.SelectTable(1)(oneS)
-  print(oneS)
-  local stacked = {}
-  for t=1,opt.TE do
-    if t%(opt.max_m+1)~= 0 then
---    print(eOffset+t)
-      local e = nn.SelectTable(t)(allEs) -- select one entry
-      e = nn.SelectTable(#DA_state)(e) -- select top most hidden state
-      local W1ej = nn.Linear(opt.rnn_size, opt.rnn_size)(e)
-      local W1W2sum = nn.CAddTable(){W1ej, W2di}
-      local act = nn.Tanh()(W1W2sum)
-      local dot = nn.Linear(opt.rnn_size, 1)(act)
-       
-      table.insert(stacked, dot)
-    end
-  end
-  
-  local ui = nn.JoinTable(1,2)(stacked)
-  
---  local pCi = nn.Linear(opt.rnn_size,opt.nClasses)(oneS)
-  local pCi = nn.LogSoftMax()(ui)
+--  local W2di = nn.Linear(opt.rnn_size, opt.rnn_size)(top_DA_state) -- W2*di
+--  allEs = inputs[eOffset+1]
+----  print(allEs)
+----  local oneS =nn.SelectTable(1)(allEs)
+----  oneS =nn.SelectTable(1)(oneS)
+--  print(oneS)
+--  local stacked = {}
+--  for t=1,opt.TE do
+--    if t%(opt.max_m+1)~= 0 then
+----    print(eOffset+t)
+--      local e = nn.SelectTable(t)(allEs) -- select one entry
+--      e = nn.SelectTable(#DA_state)(e) -- select top most hidden state
+--      local W1ej = nn.Linear(opt.rnn_size, opt.rnn_size)(e)
+--      local W1W2sum = nn.CAddTable(){W1ej, W2di}
+--      local act = nn.Tanh()(W1W2sum)
+--      local dot = nn.Linear(opt.rnn_size, 1)(act)
+--       
+--      table.insert(stacked, dot)
+--    end
+--  end
+--  
+--  local ui = nn.JoinTable(1,2)(stacked)
+--  
+----  local pCi = nn.Linear(opt.rnn_size,opt.nClasses)(oneS)
+--  local pCi = nn.LogSoftMax()(ui)
 
 
   -- insert hidden states to output
   for _,v in pairs(DA_state) do table.insert(outputs, v) end
 
 
-  table.insert(outputs,pCi)
+--  table.insert(outputs,pCi)
+  table.insert(outputs, daFinal)
 
   return nn.gModule(inputs, outputs)
 

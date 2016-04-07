@@ -2,6 +2,28 @@ require 'torch'
 require 'nn'
 require 'nngraph'
 
+function fixOpt(opt)
+  opt.max_m = opt.max_n
+  opt.model = string.lower(opt.model) -- make model name lower case
+  opt.inference = string.lower(opt.inference)
+  if string.find(opt.inference,'marg')~=nil then opt.inference='marginal' end
+  opt.model_index=1
+  if opt.model=='gru' then opt.model_index=2; end
+  if opt.model=='rnn' then opt.model_index=3; end
+  opt.nClasses = opt.max_m
+  
+  opt.inSize = opt.max_n * opt.nClasses -- input feature vector size (Linear Assignment)
+  if opt.problem=='quadratic' then
+    opt.inSize = opt.max_n*opt.max_m * opt.max_n*opt.max_m -- QBP
+  end
+  
+  opt.solSize = opt.max_n -- integer
+  if opt.solution == 'distribution' then
+    opt.solSize = opt.max_n*opt.max_m -- one hot (or full)
+  end
+  return opt
+end
+
 --------------------------------------------------------------------------
 --- each layer has the same hidden input size
 function getInitState(opt)
@@ -20,14 +42,14 @@ function getOneCost(seed)
 
   if seed ~= nil then torch.manualSeed(seed) end
 
-  local oneCost = torch.rand(opt.mini_batch_size*opt.max_n, opt.nClasses)
+  local oneCost = torch.rand(opt.mini_batch_size*opt.max_n, opt.max_m)
   --   local fillMatrix = torch.ones(opt.mini_batch_size*opt.max_n,opt.max_m) * opt.miss_thr
   --   if opt.dummy_noise ~= 0 then
   --     fillMatrix = fillMatrix + torch.rand(opt.mini_batch_size*opt.max_n,opt.max_m) * opt.dummy_noise
   --   end
 
   --  oneCost[{{},{opt.max_m+1,opt.nClasses}}] = getFillMatrix(true, opt.miss_thr, opt.dummy_noise, 1)
-  oneCost=oneCost:reshape(opt.mini_batch_size, opt.max_n*opt.nClasses)
+  oneCost=oneCost:reshape(opt.mini_batch_size, opt.max_n*opt.max_m)
 
   --   torch.manualSeed(math.random(1e10))
 
@@ -81,7 +103,7 @@ function genHunData(nSamples)
 
     local hunSols = torch.ones(1,opt.max_n):int()
     for m=1,opt.mini_batch_size do
-      local costMat = oneCost[m]:reshape(opt.max_n, opt.nClasses)
+      local costMat = oneCost[m]:reshape(opt.max_n, opt.max_m)
       local ass = hungarianL(-costMat) -- treat as similarity
       hunSols = hunSols:cat(ass[{{},{2}}]:reshape(1,opt.max_n):int(), 1)
     end
@@ -89,6 +111,12 @@ function genHunData(nSamples)
     hunSols = dataToGPU(hunSols)
     table.insert(HunTab, hunSols)
   end
+  
+  if opt.solution == 'distribution' then
+  -- convert to one hot
+  HunTab = oneHotAll(HunTab)
+  end
+  
   return CostTab, HunTab
 end
 
@@ -358,12 +386,35 @@ function insertTokens(tab)
   return TrCostTabT
 end
 
+function oneHotAll(tab)
+  local newTab = {}
+  for k,v in pairs(tab) do
+    local oneHots = torch.zeros(opt.mini_batch_size, opt.featmat_n*opt.featmat_m)
+    for m=1,opt.mini_batch_size do
+      local oneHot = dataToCPU(getOneHotLab(dataToCPU(v[m]), true, opt.max_m))
+--      print(TrSolTab[k][m])
+--      print(oneHot:reshape(1,opt.featmat_n*opt.featmat_m))
+     oneHots[m] = oneHot
+    end
+    newTab[k] = dataToGPU(oneHots)
+  end
+  return newTab
+end
+
+
 
 function findFeasibleSolutions(N,M)
   pm(string.format('Finding all feasible %d x %d assignments...',N,M))
-  -- using Penlight permute
+  local feasSolFile = string.format('%stmp/feasSol_n%d_m%d.t7',getRootDir(), N, M)
+  if exist(feasSolFile) then
+    pm('Load precomputed')
+    local loaded = torch.load(feasSolFile)
+    return loaded
+  end
+        
   local feasSol = {}
 
+  -- using Penlight permute
   local permute = require 'pl.permute';
 
   local lin = torch.linspace(1,N,N):totable()
@@ -379,9 +430,10 @@ function findFeasibleSolutions(N,M)
 
   solTable = {}
   solTable.feasSol = feasSol
-  solTable.infSol = infSol
+--  solTable.infSol = infSol
 
   print('Feasible solutions: '..#feasSol)
+  if not onNetwork() then pm('Save to disk') torch.save(feasSolFile, solTable) end
   --  abort()
 
   return solTable
@@ -473,7 +525,7 @@ function getRNNDInput(t, rnn_state, predictions, rnn_stateE)
   table.insert(rnninp, loccost)
 
   for i = 1,#rnn_state[t-1] do table.insert(rnninp,rnn_state[t-1][i]) end
-  table.insert(rnninp, rnn_stateE)
+--  table.insert(rnninp, rnn_stateE)
 
   return rnninp, rnn_state
 end
@@ -487,7 +539,6 @@ function decode(predictions, tar)
   local T = tabLen(predictions) -- how many targets
   if tar ~= nil then
     local lst = predictions[tar]
-    print(lst)
     DA = lst[opt.daPredIndex]:reshape(opt.mini_batch_size, opt.nClasses) -- opt.mini_batch_size*opt.max_n x opt.max_m
   else
     DA = zeroTensor3(opt.mini_batch_size,T,opt.nClasses)
@@ -670,7 +721,7 @@ end
 
 function plotProgress(predictions,winID, winTitle)
   local mm=0 -- number of mismatches
-  local logpredDA = decode(predictions):reshape(opt.mini_batch_size*opt.max_n,opt.nClasses):sub(1,opt.max_n)
+  local logpredDA = decode(predictions):reshape(opt.mini_batch_size*opt.max_n,opt.nClasses):sub(1,opt.max_n)  
   local predDA=costToProb(-logpredDA)
   local predAsTracks = predDA:reshape(opt.max_n, opt.max_m, 1)
   
@@ -711,6 +762,64 @@ function plotProgress(predictions,winID, winTitle)
   local plotTab = {}
   gnuplot.raw('unset ytics')
   plotTab = getPredPlotTab(plotTab, predDA, 1)
+  plotTab = getPredPlotTab(plotTab, sol, 2)
+  plot(plotTab, winID, winTitle)
+  gnuplot.raw('set ytics')
+
+  
+  return mm
+end
+
+function plotProgressD(predictions,winID, winTitle)
+  local mm=0 -- number of mismatches
+  local decodePred = decode(predictions)
+  local logpredDA = decodePred:sub(1,1):reshape(opt.max_n,opt.max_m)
+  
+--  local logpredDA = decode(predictions):reshape(opt.mini_batch_size*opt.max_n*opt.max_m,1):sub(1,opt.max_n)
+  local predDA=costToProb(-logpredDA)
+--  print(predDA)
+  local predAsTracks = predDA:reshape(opt.max_n, opt.max_m, 1)
+  
+  local hun = huns:sub(1,1)
+
+  eval_val_mm = 0
+  
+  local pmmaxv, pmmaxi = torch.max(predDA,2)
+  local cmtr = costs:sub(1,1)
+  --    print(cmtr)
+  if opt.problem == 'linear' then cmtr = cmtr:reshape(opt.max_n,opt.max_m)
+  elseif opt.problem == 'quadratic' then cmtr = cmtr:reshape(opt.max_n*opt.max_m,opt.max_n*opt.max_m)
+  end
+
+  printDebugValues(cmtr, predDA:reshape(opt.max_n, opt.max_m))
+
+  local sol = nil
+  if opt.inference == 'map' then
+    -- greedy
+    if opt.solution == 'integer' then
+      sol = hun:reshape(opt.max_n,1)
+    elseif opt.solution == 'distribution' then
+      local sv, si = torch.max(hun:reshape(opt.max_n, opt.max_m),2)
+      sol = si:clone()
+    end
+    mm = torch.sum(torch.abs(sol:float()-pmmaxi:float()):ne(0))
+  elseif opt.inference == 'marginal' then
+    -- marginals
+    --        local marginals = getMarginals(cmtr,solTable)
+    sol = hun:reshape(opt.max_n, opt.max_m)
+    local mmaxv, mmaxi = torch.max(sol,2)
+
+    mm = torch.sum(torch.abs(mmaxi-pmmaxi):ne(0))
+  end
+  sol=dataToCPU(sol)
+  predDA=dataToCPU(predDA)
+--  print(sol)
+  sol=getOneHotLab(sol, true, opt.max_m)
+  -- plot prob distributions
+  local plotTab = {}
+  gnuplot.raw('unset ytics')
+  plotTab = getPredPlotTab(plotTab, predDA, 1)
+--  print(sol)
   plotTab = getPredPlotTab(plotTab, sol, 2)
   plot(plotTab, winID, winTitle)
   gnuplot.raw('set ytics')
