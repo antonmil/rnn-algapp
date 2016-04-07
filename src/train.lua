@@ -598,4 +598,5 @@ for i = 1, opt.max_epochs do
 end
 
 print('-------------   PROFILING   INFO   ----------------')
-print(string.format('%20s%10.2f%7s','total time',ggtime:time().real,''))
+local totalH, totalM = secToHM(ggtime:time().real)
+print(string.format('%20s%5d:02d%7s','total time',totalH, totalM,''))

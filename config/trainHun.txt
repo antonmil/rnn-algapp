@@ -15,7 +15,7 @@
                
             init_from  
         training_file  
-           max_epochs  2000
+           max_epochs  20000
       mini_batch_size  10
        synth_training  100
           synth_valid  10
@@ -40,10 +40,10 @@
           dummy_noise  0
            train_type  0
           
-          print_every  10
-       eval_val_every  100
-           plot_every  100
-              dropout  0.5
+          print_every  100
+       eval_val_every  1000
+           plot_every  1000
+              dropout  0.1
              temp_win  4
            suppress_x  0
               verbose  2
@@ -65,5 +65,5 @@ lrng_rate_decay_after  -1
            decay_rate  0.97
                  seed  1
                opencl  0
-                gpuid  0
+                gpuid  -1
                 

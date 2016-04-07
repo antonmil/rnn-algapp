@@ -464,7 +464,7 @@ end
 -- @param t   time step
 -- @param rnn_state hidden state of RNN (use t-1)
 -- @param predictions current predictions to use for feed back
-function getRNNDInput(t, rnn_state, predictions)
+function getRNNDInput(t, rnn_state, predictions, rnn_stateE)
   local rnninp = {}
 
   -- Cost matrix
@@ -473,6 +473,7 @@ function getRNNDInput(t, rnn_state, predictions)
   table.insert(rnninp, loccost)
 
   for i = 1,#rnn_state[t-1] do table.insert(rnninp,rnn_state[t-1][i]) end
+  table.insert(rnninp, rnn_stateE)
 
   return rnninp, rnn_state
 end
@@ -486,6 +487,7 @@ function decode(predictions, tar)
   local T = tabLen(predictions) -- how many targets
   if tar ~= nil then
     local lst = predictions[tar]
+    print(lst)
     DA = lst[opt.daPredIndex]:reshape(opt.mini_batch_size, opt.nClasses) -- opt.mini_batch_size*opt.max_n x opt.max_m
   else
     DA = zeroTensor3(opt.mini_batch_size,T,opt.nClasses)

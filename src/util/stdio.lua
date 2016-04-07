@@ -11,10 +11,8 @@ end
 -- @param sec 	Seconds passed since start
 function printTrainingStats(i, me, tl, gn, t, lr, sec)
   local secLeft = (sec / (i/opt.max_epochs) - sec)
-  local hrsLeft = math.floor(secLeft / 3600)
-  local minLeft = torch.round((secLeft % 3600)/60)
-  local hrsElapsed = math.floor(sec / 3600)
-  local minElapsed = torch.round((sec % 3600)/60)
+  local hrsLeft, minLeft = secToHM(secLeft)
+  local hrsElapsed, minElapsed = secToHM(sec)
   
   print(string.format("%6d/%7d%10.5f %.1e%8.2fs %.1e%3d:%02d%3d:%02d", i, me, tl, gn, t,lr, hrsLeft,minLeft,hrsElapsed,minElapsed))
 end

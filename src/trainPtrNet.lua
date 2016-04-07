@@ -350,7 +350,7 @@ function eval_val()
 
     for t=1,T do
       clonesD.rnn[t]:evaluate()      -- set flag for dropout
-      local rnninp, rnn_state = getRNNDInput(t, rnn_state, predictions)    -- get combined RNN input table
+      local rnninp, rnn_state = getRNNDInput(t, rnn_state, predictions, rnn_stateE)    -- get combined RNN input table
       local lst = clonesD.rnn[t]:forward(rnninp) -- do one forward tick
       predictions[t] = lst
       --           print(lst)
@@ -419,6 +419,9 @@ function feval()
     for i=1,#init_state do table.insert(rnn_stateE[t], lst[i]) end -- extract the state, without output    
   end
 
+
+--    print(rnn_stateE)
+--    abort()
     
   -- DECODE
   local predictions = {}
@@ -433,7 +436,7 @@ function feval()
   
   for t=1,T do
     clonesD.rnn[t]:training()      -- set flag for dropout
-    rnninp, rnn_state = getRNNDInput(t, rnn_state, predictions)    -- get combined RNN input table
+    rnninp, rnn_state = getRNNDInput(t, rnn_state, predictions, rnn_stateE)    -- get combined RNN input table
     local lst = clonesD.rnn[t]:forward(rnninp) -- do one forward tick
     predictions[t] = lst
     --         print(lst)
@@ -469,7 +472,7 @@ function feval()
       table.insert(drnn_state[t], dl[dd]) -- gradient of loss at time t
     end
 
-    local rnninp = getRNNDInput(t, rnn_state, predictions)    -- get combined RNN input table
+    local rnninp = getRNNDInput(t, rnn_state, predictions, rnn_stateE)    -- get combined RNN input table
 
 
     local dlst = clonesD.rnn[t]:backward(rnninp, drnn_state[t])

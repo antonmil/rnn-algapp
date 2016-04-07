@@ -38,6 +38,12 @@ function sleep(n)  -- seconds
   while clock() - t0 <= n do end
 end
 
+function secToHM(sec)
+  local h = math.floor(sec / 3600)
+  local m = torch.round((sec % 3600)/60)
+  return h,m
+end
+
 --------------------------------------------------------------------------
 --- Abort the execution of the program (for debugging)
 -- @param msg 	optional abort message

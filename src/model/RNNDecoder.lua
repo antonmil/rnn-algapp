@@ -27,12 +27,22 @@ function RNN.rnn(opt)
 
 
   for L = 1,opt.num_layers do
-    -- one input for previous location
+    -- one input for previous h
     if LSTMMODE then table.insert(inputs, nn.Identity()():annotate{name='c^'..(L)..'_t'}) end
     table.insert(inputs, nn.Identity()():annotate{name='h^'..(L)..'_t'})
   end
 
-
+--  -- input ecoders weights W1  
+--  table.insert(inputs, nn.Identity()())
+  
+  local eOffset = #inputs  
+  -- input encoders hidden states
+--  for t=1,opt.TE do
+  table.insert(inputs, nn.Identity()())
+--  end
+  
+    
+  
 
 
 --  local inSize = opt.max_n * opt.nClasses
@@ -53,6 +63,7 @@ function RNN.rnn(opt)
   for L=1, opt.num_layers do
     -- hidden input from previous RNN
     local prev_h = inputs[opt.nHiddenInputs*L + 1]
+--    print(opt.nHiddenInputs*L + 1)
     local prev_c = {}
 
     if LSTMMODE then prev_c = inputs[2*L] end
@@ -82,34 +93,54 @@ function RNN.rnn(opt)
 
 
   if dropout > 0 then top_DA_state = nn.Dropout(dropout)(top_DA_state) end
-  local da = nn.Linear(opt.rnn_size, opt.nClasses)(top_DA_state):annotate{
-    name='DA_t',
-    description='data assoc.',
-    graphAttributes = {color='green', style='filled'}
-  }
 
+--  local da = nn.Linear(opt.rnn_size, opt.nClasses)(top_DA_state):annotate{
+--    name='DA_t',
+--    description='data assoc.',
+--    graphAttributes = {color='green', style='filled'}
+--  }
+--  local localDaRes = nn.Reshape(opt.nClasses, batchMode)(da):annotate{name='Rshp DA'}
+--  local daFinal = localDaRes
+--
+--  daFinal = nn.LogSoftMax()(localDaRes):annotate{
+--    name='DA_t',
+--    description='data assoc. LogSoftMax',
+--    graphAttributes = {color='green'}
+--  }
 
-  --   localDaRes = nn.Reshape(opt.max_n, opt.nClasses, batchMode)(da):annotate{name='Rshp DA'}
-  local localDaRes = nn.Reshape(opt.nClasses, batchMode)(da):annotate{name='Rshp DA'}
-
-  local daFinal = localDaRes
-
-  daFinal = nn.LogSoftMax()(localDaRes):annotate{
-    name='DA_t',
-    description='data assoc. LogSoftMax',
-    graphAttributes = {color='green'}
-  }
---   daFinal = nn.Sigmoid()(localDaRes)
-
+  --- construct output out of encoder inputs  
+  local W2di = nn.Linear(opt.rnn_size, opt.rnn_size)(top_DA_state) -- W2*di
+  allEs = inputs[eOffset+1]
+--  print(allEs)
+--  local oneS =nn.SelectTable(1)(allEs)
+--  oneS =nn.SelectTable(1)(oneS)
+  print(oneS)
+  local stacked = {}
+  for t=1,opt.TE do
+    if t%(opt.max_m+1)~= 0 then
+--    print(eOffset+t)
+      local e = nn.SelectTable(t)(allEs) -- select one entry
+      e = nn.SelectTable(#DA_state)(e) -- select top most hidden state
+      local W1ej = nn.Linear(opt.rnn_size, opt.rnn_size)(e)
+      local W1W2sum = nn.CAddTable(){W1ej, W2di}
+      local act = nn.Tanh()(W1W2sum)
+      local dot = nn.Linear(opt.rnn_size, 1)(act)
+       
+      table.insert(stacked, dot)
+    end
+  end
+  
+  local ui = nn.JoinTable(1,2)(stacked)
+  
+--  local pCi = nn.Linear(opt.rnn_size,opt.nClasses)(oneS)
+  local pCi = nn.LogSoftMax()(ui)
 
 
   -- insert hidden states to output
   for _,v in pairs(DA_state) do table.insert(outputs, v) end
 
 
-  table.insert(outputs,daFinal)
-  --   if daLoss then table.insert(outputs,nn.Identity()(daFinal)) end
-
+  table.insert(outputs,pCi)
 
   return nn.gModule(inputs, outputs)
 
