@@ -3,6 +3,11 @@ require 'nn'
 require 'nngraph'
 
 function fixOpt(opt)
+  if opt.sparse~=0 then error('sparse data not implemented') end
+  if opt.sparse~=0 and opt.mini_batch_size>1 then
+    error('batch not supported for sparse data')
+  end
+
   opt.max_m = opt.max_n
   opt.model = string.lower(opt.model) -- make model name lower case
   opt.inference = string.lower(opt.inference)
@@ -193,21 +198,23 @@ function readQBPData(ttmode)
   local ProbTab, SolTab = {},{}
   local ValProbTab, ValSolTab = {},{}
 
-  local Qfile = string.format('%sdata/%s/Q_N%d_M%d',getRootDir(), ttmode, opt.max_n, opt.max_m);
+  local Qfile = string.format('%sdata/%s/QBP_N%d_M%d',getRootDir(), ttmode, opt.max_n, opt.max_m);
   checkFileExist(Qfile..'.mat','Q cost file')  
   local loaded = mattorch.load(Qfile..'.mat')
   local allQ = loaded.allQ:t() -- transpose because Matlab is first-dim-major (https://groups.google.com/forum/#!topic/torch7/qDIoWnJzkcU)
+  local allSparseQ = nil
+  if opt.sparse ~= 0 then allSparseQ = loaded.allSparseQ:t():float() end  
 
 
-  local Solfile = string.format('%sdata/%s/Sol_N%d_M%d',getRootDir(), ttmode, opt.max_n, opt.max_m);
+  local Solfile = string.format('%sdata/%s/QBP_N%d_M%d',getRootDir(), ttmode, opt.max_n, opt.max_m);
   local allSol = {}
   if opt.solution == 'integer' then
-    Solfile = string.format('%sdata/%s/SolInt_N%d_M%d',getRootDir(), ttmode, opt.max_n, opt.max_m);
+    Solfile = string.format('%sdata/%s/QBP_N%d_M%d',getRootDir(), ttmode, opt.max_n, opt.max_m);
     checkFileExist(Solfile..'.mat','solution file')
     local loaded = mattorch.load(Solfile..'.mat')
     allSol = loaded.allSolInt:t() -- transpose because Matlab is first-dim-major
   elseif opt.solution == 'distribution' then
-    Solfile = string.format('%sdata/%s/Sol_N%d_M%d',getRootDir(), ttmode, opt.max_n, opt.max_m);
+    Solfile = string.format('%sdata/%s/QBP_N%d_M%d',getRootDir(), ttmode, opt.max_n, opt.max_m);
     checkFileExist(Solfile..'.mat','solution file')
     local loaded = mattorch.load(Solfile..'.mat')
     allSol = loaded.allSol:t() -- transpose because Matlab is first-dim-major
@@ -254,9 +261,12 @@ function readQBPData(ttmode)
     for mb=1,opt.mini_batch_size do
       nth=nth+1
       if nth>maxTrainingSample then nth=1 end
+--      print(allQ[nth])
+--      print(allSparseQ[nth])
+--      abort()
+      local oneQ = allQ[nth]:reshape(1,opt.inSize),1
       oneBatch = oneBatch:cat(allQ[nth]:reshape(1,opt.inSize),1)
       oneBatchSol = oneBatchSol:cat(allSol[nth]:reshape(1,opt.solSize),1)
-      --      oneBatchSol = oneBatchSol:cat(getMarginals(allQ[nth]:reshape(opt.max_n,opt.max_m):float(),solTable):reshape(1,opt.max_n*opt.max_m):float(),1)
     end
     oneBatch=oneBatch:sub(2,-1)
     oneBatchSol=oneBatchSol:sub(2,-1)
@@ -407,7 +417,7 @@ function findFeasibleSolutions(N,M)
   pm(string.format('Finding all feasible %d x %d assignments...',N,M))
   local feasSolFile = string.format('%stmp/feasSol_n%d_m%d.t7',getRootDir(), N, M)
   if exist(feasSolFile) then
-    pm('Load precomputed')
+    pm('Load precomputed.')
     local loaded = torch.load(feasSolFile)
     return loaded
   end
@@ -440,42 +450,42 @@ function findFeasibleSolutions(N,M)
 
 end
 
-function findFeasibleSolutions2(N,M)
-  --  local assFile = 'tmp/ass_n'..N..'_m'..M..'.t7'
-
-  pm('Generating feasible solutions table...')
-  local feasSol, infSol = {}, {}
-  local possibleAssignments = math.pow(2,N*M)
-
-  for s=1,possibleAssignments do
-
-    local binCode = torch.Tensor(toBits(s, N*M))
-    local ass = binCode:reshape(N,M)
-    local feasible = true
-    local sumAllEntries = torch.sum(binCode)
-    if sumAllEntries ~= N then goto continue end
-
-    local sumOverColumns = torch.sum(ass,2)
-    if torch.sum(sumOverColumns:ne(1)) > 0 then goto continue end
-
-    local sumOverRows = torch.sum(ass,1)
-    if torch.sum(sumOverRows:ne(1)) > 0 then goto continue end
-
-
-    table.insert(feasSol, ass)
-
-    --    print(s)
-    ::continue::
-  end
-  solTable = {}
-  solTable.feasSol = feasSol
-  solTable.infSol = infSol
-  --      torch.save(assFile, solTable)
-
-  pm('... done')
-  return solTable
-
-end
+--function findFeasibleSolutions2(N,M)
+--  --  local assFile = 'tmp/ass_n'..N..'_m'..M..'.t7'
+--
+--  pm('Generating feasible solutions table...')
+--  local feasSol, infSol = {}, {}
+--  local possibleAssignments = math.pow(2,N*M)
+--
+--  for s=1,possibleAssignments do
+--
+--    local binCode = torch.Tensor(toBits(s, N*M))
+--    local ass = binCode:reshape(N,M)
+--    local feasible = true
+--    local sumAllEntries = torch.sum(binCode)
+--    if sumAllEntries ~= N then goto continue end
+--
+--    local sumOverColumns = torch.sum(ass,2)
+--    if torch.sum(sumOverColumns:ne(1)) > 0 then goto continue end
+--
+--    local sumOverRows = torch.sum(ass,1)
+--    if torch.sum(sumOverRows:ne(1)) > 0 then goto continue end
+--
+--
+--    table.insert(feasSol, ass)
+--
+--    --    print(s)
+--    ::continue::
+--  end
+--  solTable = {}
+--  solTable.feasSol = feasSol
+--  solTable.infSol = infSol
+--  --      torch.save(assFile, solTable)
+--
+--  pm('... done')
+--  return solTable
+--
+--end
 
 --------------------------------------------------------------------------
 --- get all inputs for one time step

@@ -29,7 +29,7 @@ torch.manualSeed(sopt.seed)
 
 sopt.model = getRootDir()..'bin/'..sopt.model_name
 if sopt.model_sign ~= '' then sopt.model = sopt.model..'_'..sopt.model_sign end
-sopt.model = sopt.model..'.t7'
+sopt.model = sopt.model..'_val.t7'
 
 
 
@@ -69,13 +69,18 @@ if opt.inference == 'marginal' then
 end
 
 ------ try real data
-   local Qfile = string.format('%sdata/test',getRootDir());
+   local Qfile = string.format('%sdata/test_%d',getRootDir(),opt.max_n);
   checkFileExist(Qfile..'.mat','Q cost file')  
   local loaded = mattorch.load(Qfile..'.mat')
   local allQ = loaded.allQ:t() -- transpose because Matlab is first-dim-major (https://groups.google.com/forum/#!topic/torch7/qDIoWnJzkcU)
   allQ=allQ:float()
   ValCostTab[1]=allQ:reshape(1,opt.inSize)
-  ValSolTab[1] =torch.linspace(1,opt.max_n,opt.max_n):reshape(1,opt.max_n) 
+--  ValCostTab[1]=torch.rand(1,opt.inSize)
+  if opt.inference == 'marginal' then 
+    ValSolTab = computeMarginals(ValCostTab)
+  elseif opt.inference == 'map' then
+    ValSolTab[1] =torch.linspace(1,opt.max_n,opt.max_n):reshape(1,opt.max_n)
+  end 
 
 --if opt.problem == 'linear' then
 --  ValProbTab,ValSolTab = genHunData(1)

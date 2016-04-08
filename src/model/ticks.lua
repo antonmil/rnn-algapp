@@ -2,7 +2,11 @@
 function RNNTick(outputs, opt, inputSizeL, x, prev_h, L)
   local rnnSize = opt.rnn_size
   -- real input to hidden
-  i2h = nn.Linear(inputSizeL, rnnSize)(x)
+  local i2h = nil 
+  if opt.sparse==0 then i2h = nn.Linear(inputSizeL, rnnSize)(x) 
+  else
+    i2h = nn.SparseLinear(inputSizeL, rnnSize)(x) 
+  end
 
   -- hidden input to hidden
   local h2h = nn.Linear(rnnSize, rnnSize)(prev_h):annotate{name='h2h_DA_L'..L}
@@ -20,7 +24,9 @@ function LSTMTick(outputs, opt, inputSizeL, x, prev_h, prev_c, L)
   local rnnSize = opt.rnn_size
 
   -- evaluate the input sums at once for efficiency
-  local i2h = nn.Linear(inputSizeL, 4 * rnnSize)(x):annotate{name='i2h_'..L}
+  local i2h = nil
+  if opt.sparse==0 then i2h = nn.Linear(inputSizeL, 4 * rnnSize)(x):annotate{name='i2h_'..L} 
+  else i2h = nn.SparseLinear(inputSizeL, 4 * rnnSize)(x):annotate{name='i2h_'..L} end
   local h2h = nn.Linear(rnnSize, 4 * rnnSize)(prev_h):annotate{name='h2h_'..L}
   local all_input_sums = nn.CAddTable()({i2h, h2h})
 

@@ -64,7 +64,7 @@ function plot(data, winID, winTitle, rawStr, save)
     
     -- make sure output directory exists (TODO take care of global vars here)
     local _,_,modelName,modelSign = getCheckptFilename(modelName, opt, modelParams)
-    local outDir = string.format('tmp/%s_%s',modelName, modelSign)
+    local outDir = string.format('%stmp/%s_%s',getRootDir(),modelName, modelSign)
     if not lfs.attributes(outDir,'mode') then lfs.mkdir(outDir) end
     
     gnuplot.raw(string.format("set output \"%s/%s.png\"",outDir,winTitle))

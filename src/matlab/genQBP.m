@@ -1,12 +1,13 @@
 %% quadratic program data and solutions
 % first set parameters
 % problem size
-N=4;
+% addpath(
+N=10;
 M=N;
-mb = 10; % minibatch size
-nTr = 1000; % training batches
+mb = 20; % minibatch size
+nTr = 10000; % training batches
 maxSimThr = 0.8;
-sparseFactor = 0.2;
+sparseFactor = 0.8;
 A=zeros(M,N*M); Aeq=zeros(N, N*M);  % ineq and eq constr. matrices
 b=ones(M,1); beq=ones(N,1);         % ineq and eq constr. vectors
 act=1;
@@ -37,7 +38,7 @@ for ttm=ttmodes
     model.sense = char( ['<' * ones(1, length(b)), '=' * ones(1,length(beq))]);
     clear params
     params.outputflag = 0;
-    params.TimeLimit = 1; % time limit in seconds
+    params.TimeLimit = 10; % time limit in seconds
     
     
     %%% How many samples do we want?
@@ -49,12 +50,15 @@ for ttm=ttmodes
     
     
     % for saving all Qs and all solutions
-    allQ = zeros(nSamples, N*M*N*M);
-    allSol = zeros(nSamples, N*M);
-    allc = zeros(nSamples, N*M);
-    allSolInt = zeros(nSamples, N);
-    allSolTimes = zeros(nSamples, 1);
-    optres=false(nSamples,1);
+    data=[];
+    data.allQ = zeros(nSamples, N*M*N*M);
+    data.allSparseQ = zeros(nSamples, N*M*N*M);
+    data.allN = zeros(nSamples, 1); % number of non-zeros
+    data.allSol = zeros(nSamples, N*M);
+    data.allc = zeros(nSamples, N*M);
+    data.allSolInt = zeros(nSamples, N);
+    data.allSolTimes = zeros(nSamples, 1);
+    data.optres=false(nSamples,1);
     
     n=0;
     while n<nSamples
@@ -70,7 +74,7 @@ for ttm=ttmodes
         end
         Q=real(Q);
         
-        Q=(Q' * Q); % Positive semi-definite
+        Q=(Q' * Q); % Positive semi-definite        
         
         Q = Q - min(Q(:));    % >= 0
 %         Q(Q>maxSimThr)=maxSimThr;           % max
@@ -89,12 +93,20 @@ for ttm=ttmodes
 %             end
 %         end
 
-        for ii=1:N*M
-            if rand<sparseFactor
-                Q(ii,:)=0; Q(:,ii)=0;
-            end
-        end
-        Q = Q / max(Q(:));          % <= 1        
+        % sparsify according to real data
+        newK = selectSubset(Pair_M{1,randi(30)},N); %spy(newK);
+        Q(~newK)=0;
+
+%         for ii=1:N*M
+%             if rand<sparseFactor
+%                 Q(ii,:)=0; Q(:,ii)=0;
+%             end
+%         end
+
+        Q = Q / max(Q(:));          % <= 1
+        % set diag to rand
+        Q(1:N*N+1:end) = rand(1,N*N);
+%         pause
 
         
         c = rand(1,N*M);            % linear weights
@@ -102,6 +114,7 @@ for ttm=ttmodes
         model.Q = sparse(Q); c(:)=0; % quadratic weights (c=0 means no unaries)
         model.obj = c;
         
+        if ~isempty(find(isnan(model.Q), 1)), continue; end
         result = gurobi(model, params); % run gurobi
         if ~strcmpi(result.status,'optimal')
             continue;
@@ -111,45 +124,41 @@ for ttm=ttmodes
 %         result.x = zeros(N*M,1);result.x(1,1)=1;
         result.x(result.x>0.5)=1;
         result.x(result.x<=0.5)=0;
+        if n==1
+            fprintf('Estimated total time: %.1f sec (%.1f min / %.1f hr). %.1f sec per solution.\n', ...
+                result.runtime * nSamples, result.runtime * nSamples/60, result.runtime * nSamples/3600, result.runtime);
+        end
+        
+        nnz = numel(find(Q(:)));
+        torchSparse = sparseTensor(Q);        
         
         % insert in joint matrices
-        allQ(n,:) = Q(:)'; % WARNING. IS THIS CORRECT INDEXING FOR NON_SYMM MATRICES?
-        allc(n,:) = c;
-        allSol(n,:) = result.x';        
-        allSolTimes(n,1) = result.runtime;
+        data.allQ(n,:) = Q(:)'; % WARNING. IS THIS CORRECT INDEXING FOR NON_SYMM MATRICES?        
+        data.allnnz(n,1) = nnz;
+        data.allSparseQ(n,1:nnz*2) = torchSparse(:)';
+        data.allc(n,:) = c;
+        data.allSol(n,:) = result.x';        
+        data.allSolTimes(n,1) = result.runtime;
         [u,v]=find(reshape(result.x,N,M));
-        allSolInt(n,:)=u';
+        data.allSolInt(n,:)=u';
         if strcmpi(result.status,'optimal')
-            optres(n,1)=1;
+            data.optres(n,1)=1;
         end
+        if ~mod(n,round(nSamples/printDot/10)), fprintf('.'); end
         if ~mod(n,round(nSamples/printDot))
             fprintf('%.2f %%\n',n/nSamples*100);
             %         surf(Q); view(2); colorbar; drawnow;
             %         HeatMap(Q);drawnow;
+            
+            % write results
+            writeQBP(ttmode, N, M, 'QBP', data, n);
         end        
     end
     
-    fprintf('Optimal solutions found: %d / %d (= %.1f %%)\n',numel(find(optres)),nSamples,numel(find(optres))/nSamples*100);
-    fprintf('Avg. runtime per solution: %.2f sec\n',mean(allSolTimes));
+    fprintf('Optimal solutions found: %d / %d (= %.1f %%)\n',numel(find(data.optres)),nSamples,numel(find(data.optres))/nSamples*100);
+    fprintf('Avg. runtime per solution: %.2f sec\n',mean(data.allSolTimes));
     fprintf('Total runtime: %.1f sec\n',toc(setTime));
     
     
-    %% write out
-    Qfile = sprintf('../../data/%s/Q_N%d_M%d',ttmode,N,M);
-    dlmwrite([Qfile,'.txt'],allQ);
-    save([Qfile,'.mat'],'allQ');
-    
-    cfile = sprintf('../../data/%s/c_N%d_M%d',ttmode,N,M);
-    dlmwrite([cfile,'.txt'],allc);
-    save([cfile,'.mat'],'allc');
-    
-    
-    Solfile = sprintf('../../data/%s/Sol_N%d_M%d',ttmode,N,M);
-    dlmwrite([Solfile,'.txt'],allSol);
-    save([Solfile,'.mat'],'allSol');
-    
-    Solfile = sprintf('../../data/%s/SolInt_N%d_M%d',ttmode,N,M);
-    dlmwrite([Solfile,'.txt'],allSolInt);
-    save([Solfile,'.mat'],'allSolInt');
-    fprintf('\n');
+
 end

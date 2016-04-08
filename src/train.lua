@@ -46,6 +46,7 @@ cmd:option('-lambda',1,'loss weighting')
 cmd:option('-problem','quadratic','[linear|quadratic]')
 cmd:option('-inference','map','[map|marginal]')
 cmd:option('-solution','integer','[integer|distribution]')
+cmd:option('-sparse',0,'are the features passed as a sparse matrix?')
 -- optimization
 cmd:option('-lrng_rate',1e-2,'learning rate')
 cmd:option('-lrng_rate_decay',0.99,'learning rate decay')
@@ -191,7 +192,8 @@ if opt.problem == 'linear' then
 elseif opt.problem == 'quadratic' then
   TrCostTab,TrSolTab,ValCostTab,ValSolTab = readQBPData('train')
 end
-
+--print(TrCostTab[1])
+--abort()
 
 -- normalize to [0,1]
 pm('normalizing...')
@@ -529,12 +531,7 @@ for i = 1, opt.max_epochs do
     end
 
     -- save lowest val if necessary
-    if real_loss <= torch.min(plot_real_loss) then
-      pm('### New min. REAL loss found! ###',2)
-      local fn, dir, base, signature, ext = getCheckptFilename(modelName, opt, modelParams)
-      local savefile  = dir .. base .. '_' .. signature .. '_real' .. ext
-      saveCheckpoint(savefile, tracks, detections, protos, opt, train_losses, glTimer:time().real, i)
-    end
+
 
     -- plot
     local lossPlotTab = {}

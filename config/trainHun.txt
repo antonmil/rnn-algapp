@@ -1,10 +1,11 @@
           model_index  1
              rnn_size  128
-           num_layers  1
-                max_n  8
+           num_layers  3
+                max_n  7
               problem  quadratic
             inference  map
              solution  integer
+               sparse  0
             state_dim  4
            batch_size  1
             loss_type  1
@@ -15,8 +16,8 @@
             init_from  
         training_file  
            max_epochs  200000
-      mini_batch_size  10
-       synth_training  1000
+      mini_batch_size  20
+       synth_training  2000
           synth_valid  10
              full_set  0
 
