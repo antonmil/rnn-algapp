@@ -1,4 +1,4 @@
-function newK=selectSubset(K,N, saveSample)
+function newK=selectSubset(K,N, saveSample, model, params)
 %%
 if nargin<3, saveSample = false; end
 
@@ -37,6 +37,14 @@ newK=K(takeEntry',takeEntry);
 
 
 if saveSample
-    allQ=full(newK);
-    save(sprintf('%sdata/test_%d.mat',getRootDir,N),'allQ');
+    % save solution as well
+    model.Q = newK;
+    result = gurobi(model, params);
+    [u,~]=find(reshape(result.x,N,M));
+    allSol = result.x';
+    allSolInt = u'
+    result.x(:)' * newK * result.x(:)
+    
+    allQ=full(newK);    
+    save(sprintf('%sdata/test_%d.mat',getRootDir,N),'allQ','allSol','allSolInt');
 end

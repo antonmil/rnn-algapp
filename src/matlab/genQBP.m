@@ -1,24 +1,14 @@
 %% quadratic program data and solutions
 % first set parameters
 % problem size
-% addpath(
-N=10;
+addpath('Matching');
+N=5;
 M=N;
 mb = 20; % minibatch size
-nTr = 10000; % training batches
+nTr = 2000; % training batches
 maxSimThr = 0.8;
 sparseFactor = 0.8;
-A=zeros(M,N*M); Aeq=zeros(N, N*M);  % ineq and eq constr. matrices
-b=ones(M,1); beq=ones(N,1);         % ineq and eq constr. vectors
-act=1;
-for i=1:N
-    Aeq(i,act:act+M-1)=1;
-    act=act+M;
-end
-for j=1:M
-    A(j,j:M:end)=1;
-    act=act+M;
-end
+
 
 ttmodes = {'train','test'};
 % ttmodes = {'train'};
@@ -30,12 +20,7 @@ for ttm=ttmodes
     
     % set up model for gurobi
     clear model
-    model.A = sparse([A; Aeq]);
-    model.rhs = [b; beq];
-    model.vtype = 'B'; % binary
-    % model.vtype = 'C'; model.lb=0*ones(1,N*M); model.ub=1*ones(1,N*M); % relaxed
-    model.modelsense = 'max';
-    model.sense = char( ['<' * ones(1, length(b)), '=' * ones(1,length(beq))]);
+    model = getGurobiModel(N);
     clear params
     params.outputflag = 0;
     params.TimeLimit = 10; % time limit in seconds
@@ -94,7 +79,7 @@ for ttm=ttmodes
 %         end
 
         % sparsify according to real data
-        newK = selectSubset(Pair_M{1,randi(30)},N); %spy(newK);
+        newK = selectSubset(Pair_M{1,randi(length(Pair_M))},N); %spy(newK);
         Q(~newK)=0;
 
 %         for ii=1:N*M
@@ -109,7 +94,7 @@ for ttm=ttmodes
 %         pause
 
         
-        c = rand(1,N*M);            % linear weights
+        c = ones(1,N*M);            % linear weights
         
         model.Q = sparse(Q); c(:)=0; % quadratic weights (c=0 means no unaries)
         model.obj = c;
@@ -139,7 +124,7 @@ for ttm=ttmodes
         data.allc(n,:) = c;
         data.allSol(n,:) = result.x';        
         data.allSolTimes(n,1) = result.runtime;
-        [u,v]=find(reshape(result.x,N,M));
+        [u,v]=find(reshape(result.x,N,M)');
         data.allSolInt(n,:)=u';
         if strcmpi(result.status,'optimal')
             data.optres(n,1)=1;

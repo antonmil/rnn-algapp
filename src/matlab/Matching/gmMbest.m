@@ -65,6 +65,7 @@ pb = exp((yvs - max(yvs)))/sum(exp(yvs - max(yvs)));
 
 
 Probabilities = zeros(NofStates, NofStates);
+singleAcc = zeros(1, NofMBest);
 ObJ=zeros(1,NofMBest);
 Xmm=false(NofStates*NofStates,NofMBest);
 for mi=1:NofMBest
@@ -78,6 +79,8 @@ for mi=1:NofMBest
     for ni=1:NofNodes
         Probabilities(ni, cy(ni)) = Probabilities(ni, cy(ni)) + pb(mi);
     end
+    singleAcc(mi) = matchAsg(Xm , asgT);
+
 end
 
 % cdecode = hungarian(-log(Probabilities));
@@ -97,6 +100,7 @@ X=assign.X;
 acc = matchAsg(assign.X , asgT);
 
 assign.acc = acc;
+assign.singleAcc = singleAcc;
 
 assign.Xmbst = X;
 assign.objmbst = X(:)' * K1 * X(:);
@@ -106,5 +110,6 @@ assign.X = Xmm;
 
 assign.time=tme;
 
+assign.marginals = Probabilities;
 
 end

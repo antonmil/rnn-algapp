@@ -161,7 +161,11 @@ function getCheckptFilename(base, opt, modelParams)
     elseif modelParams[i] == 'loss_type'	then pr='lt'
     elseif modelParams[i] == 'linp'		then pr='li'
     elseif modelParams[i] == 'batch_size' 	then pr='b'
-    elseif modelParams[i] == 'train_type'	then pr='y' end
+    elseif modelParams[i] == 'train_type'	then pr='y' 
+    elseif modelParams[i] == 'order' then pr='o' 
+    elseif modelParams[i] == 'sol_index' then pr='s' 
+    elseif modelParams[i] == 'inf_index' then pr='i' 
+    end
     signature = signature .. pr
     if p==torch.round(p) then
       signature = signature .. string.format('%d',p)	-- append parameter

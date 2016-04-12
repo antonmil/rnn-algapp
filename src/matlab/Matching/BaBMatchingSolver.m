@@ -102,7 +102,7 @@ while(~isempty(Q))
     
 
 
-    fprintf('Iter = %d, GUB = %12.7f, GLB= %12.7f, GAP = %12.2f%%\n', BaBIter, GUB, GLB, (GUB - GLB) / GLB * 100);
+%     fprintf('Iter = %d, GUB = %12.7f, GLB= %12.7f, GAP = %12.2f%%\n', BaBIter, GUB, GLB, (GUB - GLB) / GLB * 100);
 
     if(abs(GUB - GLB)/GLB*100 < 0.5)
         break;

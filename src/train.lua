@@ -47,6 +47,8 @@ cmd:option('-problem','quadratic','[linear|quadratic]')
 cmd:option('-inference','map','[map|marginal]')
 cmd:option('-solution','integer','[integer|distribution]')
 cmd:option('-sparse',0,'are the features passed as a sparse matrix?')
+cmd:option('-invert_input',0,'Invert input? (Sutskever et al., 2014)')
+cmd:option('-double_input',0,'Double input? (Zaremba and Sutskever, 2014)')
 -- optimization
 cmd:option('-lrng_rate',1e-2,'learning rate')
 cmd:option('-lrng_rate_decay',0.99,'learning rate decay')
@@ -111,7 +113,8 @@ if string.len(opt.config)>0 then
   local fp,fn,fe = fileparts(opt.config); modelName = fn
 end
 
-modelParams = {'model_index', 'rnn_size', 'num_layers','max_n','max_m'}
+modelParams = {'model_index', 'rnn_size', 'num_layers','max_n','max_m',
+  'order','sol_index','inf_index'}
 dataParams={'synth_training','synth_valid','mini_batch_size',
   'max_n','max_m','state_dim','full_set','fixed_n',
   'temp_win','real_data','real_dets','trim_tracks'}
@@ -194,24 +197,26 @@ elseif opt.problem == 'quadratic' then
 end
 --print(TrCostTab[1])
 --abort()
-
--- normalize to [0,1]
-pm('normalizing...')
-TrCostTab = normalizeCost(TrCostTab)
-ValCostTab = normalizeCost(ValCostTab)
-
-
+--if opt.inference == 'marginal' then  
+--  solTable =  findFeasibleSolutions(opt.max_n, opt.max_m) -- get feasible solutions
+--end
 if opt.inference == 'marginal' then
   pm('Computing marginals...')
   solTable =  findFeasibleSolutions(opt.max_n, opt.max_m) -- get feasible solutions
   TrSolTab = computeMarginals(TrCostTab)
   ValSolTab = computeMarginals(ValCostTab)
 end
+
+TrCostTab = prepData(TrCostTab)
+ValCostTab = prepData(ValCostTab)
+
+
+
+
+--print(TrCostTab[1])
 --abort()
 
-
 --
---print(TrSolTab[1])
 --print(ValProbTab[1])
 --print(ValSolTab[1])
 
@@ -502,6 +507,13 @@ for i = 1, opt.max_epochs do
     pm(string.format('%10s%10d%10d%10d','Iter',minTrainLossIt,  minValidLossIt, minRealLossIt))
 
 
+    -- check if we started overfitting
+    -- heuristic: abort if no val. loss decrease for 3 last outputs
+    if ((i - minValidLossIt) > 3*opt.eval_val_every) then
+      print('Validation loss has stalled. Maybe overfitting. Stop.')
+      break
+    end
+    
     local minTrainLoss, minTrainLossIt = torch.min(plot_train_mm,1)
     local minValidLoss, minValidLossIt = torch.min(plot_val_mm,1)
     local minRealLoss, minRealLossIt = torch.min(plot_real_mm,1)
@@ -515,6 +527,9 @@ for i = 1, opt.max_epochs do
     pm(string.format('%10s%10.2f%10.2f%10.2f','Best',minTrainLoss,  minValidLoss, minRealLoss))
     pm(string.format('%10s%10d%10d%10d','Iter',minTrainLossIt,  minValidLossIt, minRealLossIt))
     pm('--------------------------------------------------------')
+    
+
+    
 
     -- save checkpt
     local savefile = getCheckptFilename(modelName, opt, modelParams)
@@ -575,4 +590,4 @@ end
 
 print('-------------   PROFILING   INFO   ----------------')
 local totalH, totalM = secToHM(ggtime:time().real)
-print(string.format('%20s%5d:02d%7s','total time',totalH, totalM,''))
+print(string.format('%20s%5d:%02d%7s','total time',totalH, totalM,''))

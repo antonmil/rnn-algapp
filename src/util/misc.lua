@@ -7,6 +7,7 @@ require 'gnuplot'	-- plotting stuffgetTracksAndDetsTables
 require 'lfs' 		-- luaFileSystem, check for dir, etc...
 require 'util.csv'	-- reading CSV files
 require 'image'		-- image load
+sha1 = require 'sha1'
 require 'util.plot'	-- plotting utils
 require 'util.io'	-- reading / writing data
 require 'util.matlab'	-- matlab like tools, union, intersect, find,...
@@ -2261,7 +2262,7 @@ end
 -- @param file type   optional for error message
 function checkFileExist(file, type)
   type = type or ''
-  assert(exist(file), type ..' ' .. file..'.mat cannot be found')
+  assert(exist(file), type ..' ' .. file..' cannot be found')
 end
 
 --------------------------------------------------------------------------
@@ -2313,4 +2314,15 @@ end
 function factorial(n)
   if n<=1 then return 1 end
   return n*factorial(n-1)
+end
+
+function getSha(tab)
+  if tab == nil or #tab == 0 then return sha1.sha1('0') end
+
+  -- use concat of first and last element inside table
+  local fe = tab[1]:view(-1)[1] 
+  local le = tab[#tab]:view(-1)[tab[#tab]:nElement()]
+  local shastr = sha1.sha1(string.format('%g%g',fe,le))
+  return shastr
+    
 end

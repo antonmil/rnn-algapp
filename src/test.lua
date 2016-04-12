@@ -18,6 +18,7 @@ cmd:text('Options')
 -- main options
 cmd:option('-model_name','trainHun','main model name')
 cmd:option('-model_sign','mt1_r100_l1_n3_m3_val','model signature')
+cmd:option('-suppress_x',0,'suppress plotting in terminal')
 cmd:option('-seed',12,'Random seed')
 cmd:text()
 -- parse input params
@@ -30,7 +31,6 @@ torch.manualSeed(sopt.seed)
 sopt.model = getRootDir()..'bin/'..sopt.model_name
 if sopt.model_sign ~= '' then sopt.model = sopt.model..'_'..sopt.model_sign end
 sopt.model = sopt.model..'_val.t7'
-
 
 
 checkFileExist(sopt.model,'model file')
@@ -46,6 +46,7 @@ opt = checkpoint.opt
 opt.mini_batch_size = 1
 opt.gpuid=-1
 opt.synth_training, opt.synth_valid = 2,2
+opt.suppress_x = sopt.suppress_x
 
 init_state = getInitState(opt, miniBatchSize)
 solTable = nil
@@ -58,29 +59,33 @@ elseif opt.problem == 'quadratic' then
 end
 
 
--- normalize to [0,1]
-pm('normalizing...')
-ValCostTab = normalizeCost(ValCostTab)  
-
 if opt.inference == 'marginal' then
   pm('Computing marginals...')
   solTable =  findFeasibleSolutions(opt.max_n, opt.max_m)
-  ValSolTab = computeMarginals(ValCostTab)
 end
 
 ------ try real data
+if opt.problem == 'quadratic' then
    local Qfile = string.format('%sdata/test_%d',getRootDir(),opt.max_n);
   checkFileExist(Qfile..'.mat','Q cost file')  
   local loaded = mattorch.load(Qfile..'.mat')
+
   local allQ = loaded.allQ:t() -- transpose because Matlab is first-dim-major (https://groups.google.com/forum/#!topic/torch7/qDIoWnJzkcU)
   allQ=allQ:float()
-  ValCostTab[1]=allQ:reshape(1,opt.inSize)
+  local inSize = opt.inSize; if opt.double_input ~= 0 then inSize=inSize/2 end
+  ValCostTab[1]=allQ:reshape(1,inSize)
 --  ValCostTab[1]=torch.rand(1,opt.inSize)
   if opt.inference == 'marginal' then 
     ValSolTab = computeMarginals(ValCostTab)
   elseif opt.inference == 'map' then
-    ValSolTab[1] =torch.linspace(1,opt.max_n,opt.max_n):reshape(1,opt.max_n)
+--    ValSolTab[1] =torch.linspace(1,opt.max_n,opt.max_n):reshape(1,opt.max_n)
+    ValSolTab[1] = loaded.allSolInt:t()
   end 
+end
+
+ValCostTab = prepData(ValCostTab)
+--print(ValCostTab[1])
+--abort()
 
 --if opt.problem == 'linear' then
 --  ValProbTab,ValSolTab = genHunData(1)
@@ -140,17 +145,25 @@ end
 local predDA = decode(predictions):reshape(opt.max_n,opt.nClasses)
 predDA=costToProb(-predDA)
 
+local pmaxv,pmaxi = torch.max(predDA,2)
+local oneHotPred = getOneHotLab(pmaxi, true, opt.max_m)
 
 --local costs = torch.rand(3,3)
 --print(opt.inSize)
 --print(predDA)
 --print(probToCost(predDA))
-local inpVec = costs:clone()
-if opt.problem=='linear' then inpVec=inpVec:reshape(opt.max_n,opt.max_m)
-elseif opt.problem=='quadratic' then inpVec=inpVec:reshape(opt.max_n*opt.max_m,opt.max_n*opt.max_m)
-end
+--local inpVec = costs:clone()
+--if opt.problem=='linear' then inpVec=inpVec:reshape(opt.max_n,opt.max_m)
+--elseif opt.problem=='quadratic' then inpVec=inpVec:reshape(opt.max_n*opt.max_m,opt.max_n*opt.max_m)
+--end
 
 --printDebugValues(inpVec, predDA)
 
 plotProgress(predictions,0,'Test')
 
+-- write results into txt
+local writeResTensor = oneHotPred:t():reshape(opt.max_n*opt.max_m,1):cat(predDA:reshape(opt.max_n*opt.max_m,1),2)
+local outFile = getRootDir()..'out'..'/'..sopt.model_name..'_'..sopt.model_sign..'.txt'
+
+csvWrite(outFile,writeResTensor)
+pm('results written to '..outFile)

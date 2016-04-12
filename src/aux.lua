@@ -7,6 +7,7 @@ function fixOpt(opt)
   if opt.sparse~=0 and opt.mini_batch_size>1 then
     error('batch not supported for sparse data')
   end
+   
 
   opt.max_m = opt.max_n
   opt.model = string.lower(opt.model) -- make model name lower case
@@ -26,6 +27,32 @@ function fixOpt(opt)
   if opt.solution == 'distribution' then
     opt.solSize = opt.max_n*opt.max_m -- one hot (or full)
   end
+  
+  opt.featmat_n, opt.featmat_m = opt.max_n, opt.max_m
+  if opt.problem == 'quadratic' then 
+    opt.featmat_n, opt.featmat_m = opt.max_n * opt.max_m, opt.max_n * opt.max_m
+  end
+
+  if opt.double_input ~= 0 then  
+    opt.inSize=opt.inSize*2
+    opt.featmat_n = opt.featmat_n*2
+    opt.featmat_m = opt.featmat_m*2
+  end
+  
+  -- setting as integers
+  if opt.problem == 'linear' then opt.order = 1
+  elseif opt.problem=='quadratic' then opt.order = 2
+  end
+  
+  if opt.solution == 'integer' then opt.sol_index = 1
+  elseif opt.solution == 'distribution' then opt.sol_index = 2
+  end
+  
+  if opt.inference == 'map' then opt.inf_index = 1
+  elseif opt.inference == 'marginal' then opt.inf_index = 2
+  end  
+  
+    
   return opt
 end
 
@@ -117,9 +144,11 @@ function genHunData(nSamples)
     table.insert(HunTab, hunSols)
   end
   
+  
+  
   if opt.solution == 'distribution' then
-  -- convert to one hot
-  HunTab = oneHotAll(HunTab)
+    -- convert to one hot
+    HunTab = oneHotAll(HunTab)
   end
   
   return CostTab, HunTab
@@ -192,6 +221,8 @@ end
 --------------------------------------------------------------------------
 --- read QBP data and solutions
 function readQBPData(ttmode)
+  local inSize = opt.inSize
+  if opt.double_input ~= 0 then opt.inSize =opt.inSize/2 end 
 
   if ttmode ==nil or (ttmode~='train' and ttmode~='test') then ttmode = 'train' end
 
@@ -300,13 +331,24 @@ function readQBPData(ttmode)
     table.insert(ValSolTab, oneBatchSol)
   end
 
+  opt.inSize = inSize
   return ProbTab, SolTab, ValProbTab, ValSolTab
 end
 
 function computeMarginals(CostTab)
   local SolTab = {}
-  
   local N,M = opt.max_n, opt.max_m
+  
+  -- try to load first
+  local shaKey = getSha(CostTab)
+  local marFile = getRootDir()..'/data/marginals/mar_N'..opt.max_n..'_M'..opt.max_m..'_'..shaKey..'t7'
+  if exist(marFile) then
+    pm('Load precomputed marginals.')
+    local loaded = torch.load(marFile)
+    return loaded  
+  end
+  
+  
   for k,v in pairs(CostTab) do
   
     if k%math.floor(#CostTab/10)==0 then print((k)*(100/(#CostTab))..' %...') end
@@ -326,11 +368,15 @@ function computeMarginals(CostTab)
         elseif opt.problem=='quadratic' then
           hypCost = evalSol(var, nil, C)   -- get solution for one assignment hypothesis
         end
+        if opt.exp_cost ~= 0 then hypCost = torch.exp(hypCost) end
 --        print(hypCost)
 --        print(torch.exp(-hypCost))
 --        marginals[idx] = marginals[idx] + torch.exp(-hypCost)   -- add to joint matrix
-          marginals[idx] = marginals[idx] + torch.exp(hypCost)   -- add to joint matrix
+--          marginals[idx] = marginals[idx] + torch.exp(hypCost)   -- add to joint matrix
+          marginals[idx] = marginals[idx] + hypCost   -- add to joint matrix
+--          print(torch.sum(marginals))
       end
+--      abort()
       
 --      print(marginals)
 --      print('---')
@@ -358,6 +404,7 @@ function computeMarginals(CostTab)
     table.insert(SolTab, dataToGPU(batchMarginals))
   end
   
+  if not onNetwork() then pm('Save marginals to disk') torch.save(marFile, SolTab) end
   
   return SolTab
 end
@@ -396,18 +443,40 @@ function insertTokens(tab)
   return TrCostTabT
 end
 
+function prepData(tab)
+  pm('normalizing...')
+  tab = normalizeCost(tab)
+
+  if opt.double_input ~= 0 then
+    for k,v in pairs(tab) do tab[k] = v:cat(v,2) end    
+  end
+
+  if opt.invert_input ~= 0 then
+    local invInd = torch.linspace(opt.inSize,1,opt.inSize):long()
+    for k,v in pairs(tab) do tab[k] = v:index(2,invInd) end
+  end
+  
+  return tab  
+end
+
 function oneHotAll(tab)
   local newTab = {}
+  local featLength = tab[1]:size(2) *tab[1]:size(2)
+--  print(tab[1]) 
+--  print(featLength)
   for k,v in pairs(tab) do
-    local oneHots = torch.zeros(opt.mini_batch_size, opt.featmat_n*opt.featmat_m)
+    local oneHots = torch.zeros(opt.mini_batch_size, featLength)
     for m=1,opt.mini_batch_size do
       local oneHot = dataToCPU(getOneHotLab(dataToCPU(v[m]), true, opt.max_m))
+--      print(oneHot)
+--      abort()
 --      print(TrSolTab[k][m])
 --      print(oneHot:reshape(1,opt.featmat_n*opt.featmat_m))
      oneHots[m] = oneHot
     end
     newTab[k] = dataToGPU(oneHots)
   end
+  
   return newTab
 end
 
@@ -417,7 +486,7 @@ function findFeasibleSolutions(N,M)
   pm(string.format('Finding all feasible %d x %d assignments...',N,M))
   local feasSolFile = string.format('%stmp/feasSol_n%d_m%d.t7',getRootDir(), N, M)
   if exist(feasSolFile) then
-    pm('Load precomputed.')
+    pm('Load precomputed solution permutations.')
     local loaded = torch.load(feasSolFile)
     return loaded
   end
@@ -443,7 +512,7 @@ function findFeasibleSolutions(N,M)
 --  solTable.infSol = infSol
 
   print('Feasible solutions: '..#feasSol)
-  if not onNetwork() then pm('Save to disk') torch.save(feasSolFile, solTable) end
+  if not onNetwork() then pm('Save permutations to disk') torch.save(feasSolFile, solTable) end
   --  abort()
 
   return solTable
@@ -712,6 +781,7 @@ function createAuxDirs()
   mkdirP(rootDir..'/data')
   mkdirP(rootDir..'/data/train')
   mkdirP(rootDir..'/data/test')
+  mkdirP(rootDir..'/data/marginals')
 end
 
 function evalSol(sol, c, Q)
@@ -741,7 +811,9 @@ function plotProgress(predictions,winID, winTitle)
   
   local pmmaxv, pmmaxi = torch.max(predDA,2)
   local cmtr = costs:sub(1,1)
-  --    print(cmtr)
+  if opt.double_input ~= 0 then cmtr=cmtr:sub(1,1,1,opt.inSize/2) end
+--      print(cmtr)
+--      abort()
   if opt.problem == 'linear' then cmtr = cmtr:reshape(opt.max_n,opt.max_m)
   elseif opt.problem == 'quadratic' then cmtr = cmtr:reshape(opt.max_n*opt.max_m,opt.max_n*opt.max_m)
   end
@@ -837,3 +909,4 @@ function plotProgressD(predictions,winID, winTitle)
   
   return mm
 end
+

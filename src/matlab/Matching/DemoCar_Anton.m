@@ -32,6 +32,8 @@ MaxOutliers = 0; % Number of outliers
 sols = cell(MaxOutliers+1, MaxInstance);
 m_sols = cell(MaxOutliers+1, MaxInstance);
 m_objs = cell(MaxOutliers+1, MaxInstance);
+marginals = cell(MaxOutliers+1, MaxInstance);
+singleAcc = cell(MaxOutliers+1, MaxInstance);
 
 GT = cell(MaxOutliers+1, MaxInstance);
 Pair_M = cell(MaxOutliers+1, MaxInstance);
@@ -54,7 +56,6 @@ for nOut = 0:MaxOutliers
         wsSrc = carAsgSrc(kFs, nOut);
         asgT = wsSrc.asgT;
         
-        
         parG = st('link', 'del'); % Delaunay triangulation for computing the graphs
         parF = st('smp', 'n', 'nBinT', 4, 'nBinR', 3); % not used, ignore it
         wsFeat = motorAsgFeat(wsSrc, parG, parF, 'svL', 1);
@@ -67,7 +68,7 @@ for nOut = 0:MaxOutliers
         GT{nOut+1,kFs}=asgT.X;
         Pair_M{nOut+1,kFs}=K;
         Unary{nOut+1,kFs}=Ct;
-        size(Ct,1)
+%         size(Ct,1)
         
                %% M-Best BP 
 %         tbp = tic;
@@ -78,6 +79,8 @@ for nOut = 0:MaxOutliers
 %         sols{nOut+1,kFs}.BPMBST=asgBPMbst.Xmbst(:);
 %         m_sols{nOut+1,kFs}.BPMBST=asgBPMbst.X;
 %         m_objs{nOut+1,kFs}.BPMBST=asgBPMbst.obj;
+%         marginals{nOut+1,kFs}.marginals = asgBPMbst.marginals;
+%         singleAcc{nOut+1,kFs}.acc = asgBPMbst.singleAcc;
 %         
 %         
 %         % print information
