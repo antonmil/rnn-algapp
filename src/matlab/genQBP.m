@@ -2,7 +2,7 @@
 % first set parameters
 % problem size
 addpath('Matching');
-N=5;
+N=8;
 M=N;
 mb = 20; % minibatch size
 nTr = 2000; % training batches

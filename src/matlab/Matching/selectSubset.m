@@ -1,5 +1,6 @@
-function newK=selectSubset(K,N, saveSample, model, params)
+function [newK,result]=selectSubset(K,N, saveSample, model, params)
 %%
+result = [];
 if nargin<3, saveSample = false; end
 
 fullN=sqrt(size(K,1)); fullM=fullN;
@@ -19,7 +20,7 @@ takePts = newOrder(1:N);
 %     end
 % end
 % takeEntry
-
+fullN;
 n=0;
 takeEntry=zeros(1,N*M);
 for i=takePts
@@ -29,7 +30,12 @@ for i=takePts
         takeEntry(n)=ii;
     end
 end
+% takeEntry
+% t1 = a=meshgrid(takeP,1:3)
+% sub2ind([fullN,fullM],takePts,takePts)
+% pause
 takeEntry=sort(takeEntry);
+% pause
 %%
 newK=K(takeEntry',takeEntry);
 % full(newK);
@@ -40,10 +46,13 @@ if saveSample
     % save solution as well
     model.Q = newK;
     result = gurobi(model, params);
-    [u,~]=find(reshape(result.x,N,M));
+    result.x = binarize(result.x);
     allSol = result.x';
-    allSolInt = u'
-    result.x(:)' * newK * result.x(:)
+    [~, allSolInt]=getOneHot(allSol);
+%     [u,~]=find(reshape(result.x,N,M)');
+
+%     allSolInt = u'
+%     result.x(:)' * newK * result.x(:)
     
     allQ=full(newK);    
     save(sprintf('%sdata/test_%d.mat',getRootDir,N),'allQ','allSol','allSolInt');

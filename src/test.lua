@@ -84,7 +84,7 @@ if opt.problem == 'quadratic' then
 end
 
 ValCostTab = prepData(ValCostTab)
---print(ValCostTab[1])
+--print(ValSolTab[1])
 --abort()
 
 --if opt.problem == 'linear' then
@@ -159,6 +159,7 @@ local oneHotPred = getOneHotLab(pmaxi, true, opt.max_m)
 
 --printDebugValues(inpVec, predDA)
 
+--print(predictions)
 plotProgress(predictions,0,'Test')
 
 -- write results into txt

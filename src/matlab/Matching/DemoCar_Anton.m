@@ -1,4 +1,4 @@
-clear variables;
+% clear variables;
 global footpath;
 %delete(gcp)
 %parpool(4);
@@ -87,6 +87,6 @@ for nOut = 0:MaxOutliers
 %         times{nOut+1,kFs} = tm;
 %         accs{nOut+1,kFs} = acc;
 %         objs{nOut+1,kFs} = obj;
-%         
+        
     end
 end

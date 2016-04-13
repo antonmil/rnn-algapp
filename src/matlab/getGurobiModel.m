@@ -1,4 +1,4 @@
-function model = getGurobiModel(N)
+function [model, params] = getGurobiModel(N)
     M = N;
     A=zeros(M,N*M); Aeq=zeros(N, N*M);  % ineq and eq constr. matrices
     b=ones(M,1); beq=ones(N,1);         % ineq and eq constr. vectors
@@ -19,4 +19,8 @@ function model = getGurobiModel(N)
     model.modelsense = 'max';
     model.sense = char( ['<' * ones(1, length(b)), '=' * ones(1,length(beq))]);
     model.obj = ones(1,N*M);
+
+    params.outputflag = 0;
+    params.TimeLimit = 10; % time limit in seconds
+    
 end
