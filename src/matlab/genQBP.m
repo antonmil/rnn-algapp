@@ -4,8 +4,10 @@
 addpath('Matching');
 N=8;
 M=N;
-mb = 20; % minibatch size
-nTr = 2000; % training batches
+
+Ns=N;
+mb = 10; % minibatch size
+nTr = 1000; % training batches
 maxSimThr = 0.8;
 sparseFactor = 0.8;
 
@@ -14,6 +16,8 @@ ttmodes = {'train','test'};
 % ttmodes = {'train'};
 
 for ttm=ttmodes
+    dv = datevec(now);
+    dv = [];
     ttmode = char(ttm);
     setTime = tic;
     % ttmode = 'test';
@@ -79,24 +83,41 @@ for ttm=ttmodes
 %         end
 
         % sparsify according to real data
-        newK = selectSubset(Pair_M{1,randi(length(Pair_M))},N); %spy(newK);
+        RM = Pair_M{1,randi(length(Pair_M))};
+        newK = selectSubset(RM,Ns); %spy(newK);
         Q(~newK)=0;
+%         Q(1:Ns*Ns,1:Ns*Ns) = Q(1:Ns*Ns,1:Ns*Ns).*(~~newK);
+ 
 
-%         for ii=1:N*M
-%             if rand<sparseFactor
-%                 Q(ii,:)=0; Q(:,ii)=0;
-%             end
-%         end
-
-        Q = Q / max(Q(:));          % <= 1
+        
         % set diag to rand
         Q(1:N*N+1:end) = rand(1,N*N);
+           
+        % sparsify more
+        rmNPts = randi(N)-1;
+        if rmNPts>0
+            rmPts = randperm(N); rmPts=rmPts(1:rmNPts);
+            rmEntries = zeros(1,length(rmPts)^2);
+            nn=0;
+            for i=rmPts, 
+                for j=rmPts, 
+                    ii=sub2ind([N,M],i,j);
+                    nn=nn+1;
+                    rmEntries(nn)=ii;
+                    Q(ii,:)=0;
+                    Q(:,ii)=0;
+                end            
+            end
+        end
+%         rmPts
+%         rmEntries
 %         pause
 
+        Q = Q / max(Q(:));          % <= 1
         
         c = ones(1,N*M);            % linear weights
         
-        model.Q = sparse(Q); c(:)=0; % quadratic weights (c=0 means no unaries)
+        model.Q = sparse(Q); c(:)=1; % quadratic weights (c=const means no unaries)
         model.obj = c;
         
         if ~isempty(find(isnan(model.Q), 1)), continue; end
@@ -107,8 +128,7 @@ for ttm=ttmodes
         n=n+1;
 %         result.status = 'TIME_LIMIT';
 %         result.x = zeros(N*M,1);result.x(1,1)=1;
-        result.x(result.x>0.5)=1;
-        result.x(result.x<=0.5)=0;
+        result.x = binarize(result.x);
         if n==1
             fprintf('Estimated total time: %.1f sec (%.1f min / %.1f hr). %.1f sec per solution.\n', ...
                 result.runtime * nSamples, result.runtime * nSamples/60, result.runtime * nSamples/3600, result.runtime);
@@ -124,8 +144,8 @@ for ttm=ttmodes
         data.allc(n,:) = c;
         data.allSol(n,:) = result.x';        
         data.allSolTimes(n,1) = result.runtime;
-        [u,v]=find(reshape(result.x,N,M)');
-        data.allSolInt(n,:)=u';
+        [~,ass] = getOneHot(result.x);
+        data.allSolInt(n,:) = ass;
         if strcmpi(result.status,'optimal')
             data.optres(n,1)=1;
         end
@@ -136,7 +156,7 @@ for ttm=ttmodes
             %         HeatMap(Q);drawnow;
             
             % write results
-            writeQBP(ttmode, N, M, 'QBP', data, n);
+            writeQBP(ttmode, N, M, 'QBP', data, n, dv);
         end        
     end
     

@@ -13,6 +13,11 @@ function fixOpt(opt)
   opt.model = string.lower(opt.model) -- make model name lower case
   opt.inference = string.lower(opt.inference)
   if string.find(opt.inference,'marg')~=nil then opt.inference='marginal' end
+  
+  assert(opt.problem=='linear' or opt.problem=='quadratic', 'unknown problem option')
+  assert(opt.solution=='integer' or opt.solution=='distribution', 'unknown solution option')
+  assert(opt.inference=='map' or opt.inference=='marginal', 'unknown inference option')
+  
   opt.model_index=1
   if opt.model=='gru' then opt.model_index=2; end
   if opt.model=='rnn' then opt.model_index=3; end
@@ -131,6 +136,31 @@ function genHunData(nSamples)
     --     print(oneCost)
     --     abort()
     oneCost = dataToGPU(oneCost)
+--    print(oneCost)
+    
+    
+    -- sparsify
+    local dimSizes = torch.Tensor({opt.max_n, opt.max_m})
+    for m=1,opt.mini_batch_size do
+      for dim=1,2 do
+        local dSize=dimSizes[dim]
+        local remNPts = math.random(dSize-1)        
+--        local remPts = torch.randperm(dSize):sub(1,remNPts)
+--        for r=1,remNPts do
+--          local remPts = remPts[r]
+--          oneCost[m]:view(opt.max_n,opt.max_m):narrow(dim,remPts,1):fill(0)
+--        end
+        local remNPts = math.random(dSize)-1 -- remove [0,N-1] points
+        if remNPts>0 then
+          oneCost[m]:view(opt.max_n,opt.max_m):narrow(dim,dSize-remNPts+1,remNPts):fill(0)
+        end
+      end
+--      local remNPts = math.random(dSize-1)  
+      
+    end
+--    print(oneCost)    
+--    abort()
+    
     table.insert(CostTab, oneCost)
 
     local hunSols = torch.ones(1,opt.max_n):int()
@@ -409,6 +439,31 @@ function computeMarginals(CostTab)
   return SolTab
 end
 
+function getData(opt, getTraining, getValidation)
+  local _
+  pm('getting training/validation data...')
+  if opt.problem == 'linear' then
+    ----- gen data for Hungarian
+    if getTraining then TrCostTab,TrSolTab = genHunData(opt.synth_training) end
+    if getValidation then ValCostTab,ValSolTab = genHunData(opt.synth_valid) end
+  elseif opt.problem == 'quadratic' then
+    if getTraining and getValidation then
+      TrCostTab,TrSolTab,ValCostTab,ValSolTab = readQBPData('train')
+    elseif getTraining then
+      TrCostTab,TrSolTab = readQBPData('train')
+    end
+  end
+  
+  if opt.inference == 'marginal' then
+    pm('Computing marginals...')  
+    if getTraining then TrSolTab = computeMarginals(TrCostTab) end
+    if getValidation then ValSolTab = computeMarginals(ValCostTab) end
+  end
+  
+  if getTraining then TrCostTab = prepData(TrCostTab) end
+  if getValidation then ValCostTab = prepData(ValCostTab) end
+end
+
 function normalizeCost(CostTab)
   for k,v in pairs(CostTab) do
 --    print(CostTab[k])
@@ -647,6 +702,7 @@ function printDebugValues(C, Pred)
 
   --  local C = probToCost(C) -- negative log-probability (cost)
   --  local N,M = getDataSize(P)
+
   C=dataToCPU(C)
   Pred=dataToCPU(Pred)
   
@@ -671,10 +727,10 @@ function printDebugValues(C, Pred)
   pmaxv=pmaxv:reshape(N) pmaxi=pmaxi:reshape(N)
 
   if opt.problem == 'linear' then
-    local minv, mini = torch.min(C,2)
+    local minv, mini = torch.max(C,2)
     minv=minv:reshape(N) mini=mini:reshape(N)
 
-    local HunAss = hungarianL(C)
+    local HunAss = hungarianL(-C)  -- negative is for similarity
     
 --    local marginals = getMarginals(C,solTable)
 --
@@ -805,6 +861,7 @@ function plotProgress(predictions,winID, winTitle)
   local predDA=costToProb(-logpredDA)
   local predAsTracks = predDA:reshape(opt.max_n, opt.max_m, 1)
   
+--  print(huns)
   local hun = huns:sub(1,1)
 
   eval_val_mm = 0
@@ -839,6 +896,7 @@ function plotProgress(predictions,winID, winTitle)
   end
   sol=dataToCPU(sol)
   predDA=dataToCPU(predDA)
+--  print(sol)
   if opt.solution == 'integer' then sol=getOneHotLab(sol, true) end
   -- plot prob distributions
   local plotTab = {}

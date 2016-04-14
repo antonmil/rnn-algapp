@@ -1,13 +1,13 @@
           model_index  1
              rnn_size  64
            num_layers  1
-                max_n  8
-              problem  quadratic
+                max_n  6
+              problem  linear
             inference  marginal
              solution  distribution
                sparse  0
          invert_input  0
-         double_input  1
+         double_input  0
              exp_cost  1
             state_dim  4
            batch_size  1

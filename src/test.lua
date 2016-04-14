@@ -62,6 +62,7 @@ end
 if opt.inference == 'marginal' then
   pm('Computing marginals...')
   solTable =  findFeasibleSolutions(opt.max_n, opt.max_m)
+  ValSolTab = computeMarginals(ValCostTab)
 end
 
 ------ try real data
@@ -82,8 +83,9 @@ if opt.problem == 'quadratic' then
     ValSolTab[1] = loaded.allSolInt:t()
   end 
 end
-
+--print(ValCostTab[1]:view(opt.max_n,opt.max_m))
 ValCostTab = prepData(ValCostTab)
+--print(ValCostTab[1])
 --print(ValSolTab[1])
 --abort()
 
@@ -92,6 +94,7 @@ ValCostTab = prepData(ValCostTab)
 --elseif opt.problem == 'quadratic' then
 --  _,_,ValProbTab,ValSolTab = readQBPData('test')
 --end
+
 local nthSample=1
 
 

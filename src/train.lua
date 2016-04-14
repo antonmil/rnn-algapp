@@ -120,25 +120,45 @@ dataParams={'synth_training','synth_valid','mini_batch_size',
   'temp_win','real_data','real_dets','trim_tracks'}
 
 
--- create prototype
-print('creating an '..opt.model..' with ' .. opt.num_layers .. ' layers')
-protos = {}
-protos.rnn = RNN.rnn(opt)
-local lambda = opt.lambda
-local nllc = nn.ClassNLLCriterion()
-local bce = nn.BCECriterion()
-local mse = nn.MSECriterion()
-local abserr = nn.AbsCriterion()
-local kl = nn.DistKLDivCriterion()
-local mlm = nn.MultiLabelMarginCriterion()
-local mlsm = nn.MultiLabelSoftMarginCriterion()
-protos.criterion = nn.ParallelCriterion()
-if opt.solution == 'integer' then
-  protos.criterion:add(nllc, opt.lambda)
-elseif opt.solution == 'distribution' then
-  protos.criterion:add(kl, opt.lambda)
-end
+-- create (or load) prototype
+local do_random_init = true
+local itOffset = 0
+if string.len(opt.init_from) > 0 then
+  print('loading an '..opt.model..' from checkpoint ' .. opt.init_from)
+  local checkpoint = torch.load(opt.init_from)
+  protos = checkpoint.protos
 
+  -- need to adjust some crucial parameters according to checkpoint
+  pm('overwriting ...',2)  
+  for _, v in pairs(modelParams) do
+    if opt[v] ~= checkpoint.opt[v] then
+      opt[v] = checkpoint.opt[v]
+      pm(string.format('%15s',v) ..'\t = ' .. checkpoint.opt[v], 2)
+    end
+  end
+  pm('            ... based on the checkpoint.',2)
+  do_random_init = false
+  itOffset = checkpoint.it
+  pm('Resuming from iteration '..itOffset+1,2)
+else
+  print('creating an '..opt.model..' with ' .. opt.num_layers .. ' layers')
+  protos = {}
+  protos.rnn = RNN.rnn(opt)
+  local lambda = opt.lambda
+  local nllc = nn.ClassNLLCriterion()
+  local bce = nn.BCECriterion()
+  local mse = nn.MSECriterion()
+  local abserr = nn.AbsCriterion()
+  local kl = nn.DistKLDivCriterion()
+  local mlm = nn.MultiLabelMarginCriterion()
+  local mlsm = nn.MultiLabelSoftMarginCriterion()
+  protos.criterion = nn.ParallelCriterion()
+  if opt.solution == 'integer' then
+    protos.criterion:add(nllc, opt.lambda)
+  elseif opt.solution == 'distribution' then
+    protos.criterion:add(kl, opt.lambda)
+  end
+end
 
 ------- GRAPH -----------
 if not onNetwork() then
@@ -148,7 +168,6 @@ if not onNetwork() then
 end
 -------------------------
 
-local itOffset = 0
 -- the initial state of the cell/hidden states
 init_state = getInitState(opt, opt.mini_batch_size)
 
@@ -158,7 +177,6 @@ for k,v in pairs(protos) do v = dataToGPU(v) end
 
 -- put the above things into one flattened parameters tensor
 params, grad_params = model_utils.combine_all_parameters(protos.rnn)
-local do_random_init = true
 if do_random_init then params:uniform(-opt.rand_par_rng, opt.rand_par_rng) end
 -- initialize the LSTM forget gates with slightly higher biases to encourage remembering in the beginning
 if opt.model == 'lstm' then
@@ -183,34 +201,16 @@ for name,proto in pairs(protos) do
 end
 pm('   ...done',2)
 
-
-
 solTable = nil
-
-pm('getting training/validation data...')
-if opt.problem == 'linear' then
-  ----- gen data for Hungarian
-  TrCostTab,TrSolTab = genHunData(opt.synth_training)
-  ValCostTab,ValSolTab = genHunData(opt.synth_valid)
-elseif opt.problem == 'quadratic' then
-  TrCostTab,TrSolTab,ValCostTab,ValSolTab = readQBPData('train')
-end
---print(TrCostTab[1])
---abort()
---if opt.inference == 'marginal' then  
---  solTable =  findFeasibleSolutions(opt.max_n, opt.max_m) -- get feasible solutions
---end
 if opt.inference == 'marginal' then
-  pm('Computing marginals...')
   solTable =  findFeasibleSolutions(opt.max_n, opt.max_m) -- get feasible solutions
-  TrSolTab = computeMarginals(TrCostTab)
-  ValSolTab = computeMarginals(ValCostTab)
 end
-
-TrCostTab = prepData(TrCostTab)
-ValCostTab = prepData(ValCostTab)
+  
 
 
+
+
+getData(opt, true, true)
 
 
 --print(TrCostTab[1])
@@ -429,6 +429,10 @@ local glTimer = torch.Timer()
 for i = 1, opt.max_epochs do
   local epoch = i
   globiter = i
+  
+  if i>1 and (i-1)%opt.synth_training==0 and opt.random_epoch~=0 then
+    getData(opt, true, false)
+  end
 
   local timer = torch.Timer()
   local _, loss = optim.rmsprop(feval, params, optim_state)
