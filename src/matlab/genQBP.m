@@ -4,6 +4,7 @@
 addpath('Matching');
 N=8;
 M=N;
+rng('shuffle')
 
 Ns=N;
 mb = 10; % minibatch size

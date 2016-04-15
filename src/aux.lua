@@ -259,25 +259,27 @@ function readQBPData(ttmode)
   local ProbTab, SolTab = {},{}
   local ValProbTab, ValSolTab = {},{}
 
-  local Qfile = string.format('%sdata/%s/QBP_N%d_M%d',getRootDir(), ttmode, opt.max_n, opt.max_m);
-  checkFileExist(Qfile..'.mat','Q cost file')  
-  local loaded = mattorch.load(Qfile..'.mat')
+  local Qfile = string.format('%sdata/%s/QBP_N%d_M%d.mat',getRootDir(), ttmode, opt.max_n, opt.max_m);
+  checkFileExist(Qfile,'Q cost file')
+  local loaded = mattorch.load(Qfile)
+  pm('Loaded data file '..Qfile)
   local allQ = loaded.allQ:t() -- transpose because Matlab is first-dim-major (https://groups.google.com/forum/#!topic/torch7/qDIoWnJzkcU)
+  pm('Check first entry: '..allQ[1][1])
   local allSparseQ = nil
   if opt.sparse ~= 0 then allSparseQ = loaded.allSparseQ:t():float() end  
 
 
-  local Solfile = string.format('%sdata/%s/QBP_N%d_M%d',getRootDir(), ttmode, opt.max_n, opt.max_m);
+  local Solfile = string.format('%sdata/%s/QBP_N%d_M%d.mat',getRootDir(), ttmode, opt.max_n, opt.max_m);
   local allSol = {}
   if opt.solution == 'integer' then
-    Solfile = string.format('%sdata/%s/QBP_N%d_M%d',getRootDir(), ttmode, opt.max_n, opt.max_m);
-    checkFileExist(Solfile..'.mat','solution file')
-    local loaded = mattorch.load(Solfile..'.mat')
+    Solfile = string.format('%sdata/%s/QBP_N%d_M%d.mat',getRootDir(), ttmode, opt.max_n, opt.max_m);
+    checkFileExist(Solfile,'solution file')
+    local loaded = mattorch.load(Solfile)
     allSol = loaded.allSolInt:t() -- transpose because Matlab is first-dim-major
   elseif opt.solution == 'distribution' then
-    Solfile = string.format('%sdata/%s/QBP_N%d_M%d',getRootDir(), ttmode, opt.max_n, opt.max_m);
-    checkFileExist(Solfile..'.mat','solution file')
-    local loaded = mattorch.load(Solfile..'.mat')
+    Solfile = string.format('%sdata/%s/QBP_N%d_M%d.mat',getRootDir(), ttmode, opt.max_n, opt.max_m);
+    checkFileExist(Solfile,'solution file')
+    local loaded = mattorch.load(Solfile)
     allSol = loaded.allSol:t() -- transpose because Matlab is first-dim-major
   end
 

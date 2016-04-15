@@ -1,13 +1,13 @@
           model_index  1
              rnn_size  64
            num_layers  1
-                max_n  6
-              problem  linear
-            inference  marginal
-             solution  distribution
+                max_n  8
+              problem  quadratic
+            inference  map
+             solution  integer
                sparse  0
-         invert_input  0
-         double_input  0
+         invert_input  1
+         double_input  1
              exp_cost  1
             state_dim  4
            batch_size  1
@@ -16,11 +16,11 @@
               fixed_n  1
                lambda  1
                
-            init_from  
+            init_from
         training_file  
            max_epochs  200000
-      mini_batch_size  20
-       synth_training  2000
+      mini_batch_size  10
+       synth_training  1000
           synth_valid  10
              full_set  0
 
@@ -37,7 +37,7 @@
        reshuffle_dets  1
            order_dets  0
          use_gt_input  1
-         random_epoch  0
+         random_epoch  1
        freq_reshuffle  0
               permute  0
           dummy_noise  0

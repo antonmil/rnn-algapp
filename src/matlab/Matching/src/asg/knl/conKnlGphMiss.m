@@ -36,7 +36,7 @@ n1 = size(XPs{1}, 2);
 n2 = size(XPs{2}, 2);
 m1 = size(XQs{1}, 2);
 m2 = size(XQs{2}, 2);
-prIn('conKnlGph', 'alg %s, n1 %d, n2 %d, m1 %d, m2 %d', alg, n1, n2, m1, m2);
+% prIn('conKnlGph', 'alg %s, n1 %d, n2 %d, m1 %d, m2 %d', alg, n1, n2, m1, m2);
 
 % node & edge affinity
 [KP, KQ] = knlPQ(XPs, XQs, Egs, alg);

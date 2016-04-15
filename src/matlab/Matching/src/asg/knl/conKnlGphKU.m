@@ -25,7 +25,7 @@ KQ = [KQ, KQ; KQ, KQ];
 [n1, n2] = size(KP);
 [m1, m2] = size(KQ);
 nn = n1 * n2;
-prIn('conKnlGphKU', 'nn %d, m1 %d, m2 %d', nn, m1, m2);
+% prIn('conKnlGphKU', 'nn %d, m1 %d, m2 %d', nn, m1, m2);
 
 % edge
 Eg1 = gphs{1}.Eg;

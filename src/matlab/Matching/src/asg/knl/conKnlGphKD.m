@@ -21,7 +21,7 @@ function K = conKnlGphKD(KP, KQ, gphs)
 [n1, n2] = size(KP);
 [m1, m2] = size(KQ);
 nn = n1 * n2;
-prIn('conKnlGphKD', 'nn %d, m1 %d, m2 %d', nn, m1, m2);
+% prIn('conKnlGphKD', 'nn %d, m1 %d, m2 %d', nn, m1, m2);
 
 % edge
 Eg1 = gphs{1}.Eg;

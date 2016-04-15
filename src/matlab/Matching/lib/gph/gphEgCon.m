@@ -108,4 +108,4 @@ end
 
 % print information
 m = length(idx);
-prInOut('gphAdj', 'link %s, val %.1f, #points %d, #edges %d', link, val, n, m);
+% prInOut('gphAdj', 'link %s, val %.1f, #points %d, #edges %d', link, val, n, m);

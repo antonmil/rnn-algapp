@@ -31,7 +31,7 @@ gph2 = gphs{2};
 [n2, m2] = size(gph2.G);
 m1 = m1 * 2;
 m2 = m2 * 2;
-prIn('conKnlGphPQU', 'alg %s, n1 %d, n2 %d, m1 %d, m2 %d', alg, n1, n2, m1, m2);
+% prIn('conKnlGphPQU', 'alg %s, n1 %d, n2 %d, m1 %d, m2 %d', alg, n1, n2, m1, m2);
 
 % for toy data
 if strcmp(alg, 'toy')

@@ -29,7 +29,7 @@ nF = size(P, 1);
 k10 = size(As{1}, 1);
 k20 = size(As{2}, 1);
 k0 = k10 * k20;
-prIn('conKnlGphTra', 'k10 %d, k20 %d, nF %d', k10, k20, nF);
+% prIn('conKnlGphTra', 'k10 %d, k20 %d, nF %d', k10, k20, nF);
 
 % per frame
 [KP, CP] = zeross(k10, k20);

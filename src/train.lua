@@ -430,9 +430,8 @@ for i = 1, opt.max_epochs do
   local epoch = i
   globiter = i
   
-  if i>1 and (i-1)%opt.synth_training==0 and opt.random_epoch~=0 then
-    getData(opt, true, false)
-  end
+--  if i>1 and (i-1)%opt.synth_training==0 and opt.random_epoch~=0 then
+
 
   local timer = torch.Timer()
   local _, loss = optim.rmsprop(feval, params, optim_state)
@@ -512,6 +511,12 @@ for i = 1, opt.max_epochs do
 
 
     -- check if we started overfitting
+    -- first try generating new data
+    if ((i - minValidLossIt) > 2*opt.eval_val_every) and opt.random_epoch~=0 then
+      os.execute("sh genData.sh")
+      getData(opt, true, false)
+    end
+      
     -- heuristic: abort if no val. loss decrease for 3 last outputs
     if ((i - minValidLossIt) > 3*opt.eval_val_every) then
       print('Validation loss has stalled. Maybe overfitting. Stop.')
