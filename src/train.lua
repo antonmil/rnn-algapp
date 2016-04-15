@@ -513,7 +513,7 @@ for i = 1, opt.max_epochs do
     -- check if we started overfitting
     -- first try generating new data
     if ((i - minValidLossIt) > 2*opt.eval_val_every) and opt.random_epoch~=0 then
-      os.execute("sh genData.sh")
+      if opt.problem == 'quadratic' then os.execute("sh genData.sh") end
       getData(opt, true, false)
     end
       

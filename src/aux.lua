@@ -23,10 +23,15 @@ function fixOpt(opt)
   if opt.model=='rnn' then opt.model_index=3; end
   opt.nClasses = opt.max_m
   
+--  opt.splitInput = 0
   opt.inSize = opt.max_n * opt.nClasses -- input feature vector size (Linear Assignment)
   if opt.problem=='quadratic' then
     opt.inSize = opt.max_n*opt.max_m * opt.max_n*opt.max_m -- QBP
   end
+--  opt.splitInput = 1
+  opt.inSize2 = opt.nClasses  
+  if opt.problem == 'quadratic' then opt.inSize2 = opt.max_n*opt.max_n*opt.max_m end
+--  opt.inSize2 = opt.inSize
   
   opt.solSize = opt.max_n -- integer
   if opt.solution == 'distribution' then
@@ -140,24 +145,23 @@ function genHunData(nSamples)
     
     
     -- sparsify
-    local dimSizes = torch.Tensor({opt.max_n, opt.max_m})
-    for m=1,opt.mini_batch_size do
-      for dim=1,2 do
-        local dSize=dimSizes[dim]
-        local remNPts = math.random(dSize-1)        
---        local remPts = torch.randperm(dSize):sub(1,remNPts)
---        for r=1,remNPts do
---          local remPts = remPts[r]
---          oneCost[m]:view(opt.max_n,opt.max_m):narrow(dim,remPts,1):fill(0)
+--    local dimSizes = torch.Tensor({opt.max_n, opt.max_m})
+--    for m=1,opt.mini_batch_size do
+--      for dim=1,2 do
+--        local dSize=dimSizes[dim]
+--        local remNPts = math.random(dSize-1)        
+----        local remPts = torch.randperm(dSize):sub(1,remNPts)
+----        for r=1,remNPts do
+----          local remPts = remPts[r]
+----          oneCost[m]:view(opt.max_n,opt.max_m):narrow(dim,remPts,1):fill(0)
+----        end
+--        local remNPts = math.random(dSize)-1 -- remove [0,N-1] points
+--        if remNPts>0 then
+--          oneCost[m]:view(opt.max_n,opt.max_m):narrow(dim,dSize-remNPts+1,remNPts):fill(0)
 --        end
-        local remNPts = math.random(dSize)-1 -- remove [0,N-1] points
-        if remNPts>0 then
-          oneCost[m]:view(opt.max_n,opt.max_m):narrow(dim,dSize-remNPts+1,remNPts):fill(0)
-        end
-      end
---      local remNPts = math.random(dSize-1)  
-      
-    end
+--      end
+----      local remNPts = math.random(dSize-1)        
+--    end
 --    print(oneCost)    
 --    abort()
     
@@ -623,6 +627,14 @@ function getRNNInput(t, rnn_state, predictions)
 
   -- Cost matrix
   local loccost = costs:clone():reshape(opt.mini_batch_size, opt.inSize)
+  if opt.inSize2~=opt.inSize then
+--    print(t)
+--    print(loccost)
+    local from = (t-1)*opt.inSize2+1
+    loccost = loccost:narrow(2,from,opt.inSize2)
+--    print(loccost:narrow(2,from,opt.inSize2))
+--    abort()
+  end
   --  loccost = probToCost(loccost)
   table.insert(rnninp, loccost)
 

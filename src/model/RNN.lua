@@ -40,7 +40,7 @@ function RNN.rnn(opt)
 
 
 --  local inSize = opt.max_n * opt.nClasses
-  local inSize = opt.inSize -- input feature vector size
+  local inSize = opt.inSize2 -- input feature vector size
 
   local x, prev_d, stateDimL, xl, exi, inputSizeL
   local outputs = {}

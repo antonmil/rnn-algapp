@@ -30,7 +30,7 @@ torch.manualSeed(sopt.seed)
 
 sopt.model = getRootDir()..'bin/'..sopt.model_name
 if sopt.model_sign ~= '' then sopt.model = sopt.model..'_'..sopt.model_sign end
-sopt.model = sopt.model..'_val.t7'
+sopt.model = sopt.model..'.t7'
 
 
 checkFileExist(sopt.model,'model file')
