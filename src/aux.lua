@@ -31,6 +31,7 @@ function fixOpt(opt)
 --  opt.splitInput = 1
   opt.inSize2 = opt.nClasses  
   if opt.problem == 'quadratic' then opt.inSize2 = opt.max_n*opt.max_n*opt.max_m end
+  
 --  opt.inSize2 = opt.inSize
   
   opt.solSize = opt.max_n -- integer
@@ -145,26 +146,30 @@ function genHunData(nSamples)
     
     
     -- sparsify
---    local dimSizes = torch.Tensor({opt.max_n, opt.max_m})
---    for m=1,opt.mini_batch_size do
---      for dim=1,2 do
---        local dSize=dimSizes[dim]
---        local remNPts = math.random(dSize-1)        
-----        local remPts = torch.randperm(dSize):sub(1,remNPts)
-----        for r=1,remNPts do
-----          local remPts = remPts[r]
-----          oneCost[m]:view(opt.max_n,opt.max_m):narrow(dim,remPts,1):fill(0)
-----        end
---        local remNPts = math.random(dSize)-1 -- remove [0,N-1] points
---        if remNPts>0 then
---          oneCost[m]:view(opt.max_n,opt.max_m):narrow(dim,dSize-remNPts+1,remNPts):fill(0)
+    local doSparsify = true
+    local doSparsify = false
+    
+    if doSparsify then
+    local dimSizes = torch.Tensor({opt.max_n, opt.max_m})
+    for m=1,opt.mini_batch_size do
+      for dim=1,2 do
+        local dSize=dimSizes[dim]
+        local remNPts = math.random(dSize-1)        
+--        local remPts = torch.randperm(dSize):sub(1,remNPts)
+--        for r=1,remNPts do
+--          local remPts = remPts[r]
+--          oneCost[m]:view(opt.max_n,opt.max_m):narrow(dim,remPts,1):fill(0)
 --        end
---      end
-----      local remNPts = math.random(dSize-1)        
---    end
+        local remNPts = math.random(dSize)-1 -- remove [0,N-1] points
+        if remNPts>0 then
+          oneCost[m]:view(opt.max_n,opt.max_m):narrow(dim,dSize-remNPts+1,remNPts):fill(0)
+        end
+      end
+--      local remNPts = math.random(dSize-1)        
+    end
 --    print(oneCost)    
 --    abort()
-    
+    end
     table.insert(CostTab, oneCost)
 
     local hunSols = torch.ones(1,opt.max_n):int()
@@ -631,8 +636,11 @@ function getRNNInput(t, rnn_state, predictions)
 --    print(t)
 --    print(loccost)
     local from = (t-1)*opt.inSize2+1
-    loccost = loccost:narrow(2,from,opt.inSize2)
+--    print(t,from)
 --    print(loccost:narrow(2,from,opt.inSize2))
+    
+    loccost = loccost:narrow(2,from,opt.inSize2)
+    
 --    abort()
   end
   --  loccost = probToCost(loccost)
@@ -894,8 +902,10 @@ function plotProgress(predictions,winID, winTitle)
   local sol = nil
   if opt.inference == 'map' then
     -- greedy
-    sol = hun:reshape(opt.max_n,1)
-    if opt.solution == 'distribution' then
+    
+    if opt.solution == 'integer' then
+      sol = hun:reshape(opt.max_n,1)
+    elseif opt.solution == 'distribution' then
       local sv, si = torch.max(hun:reshape(opt.max_n, opt.max_m),2)
       sol = si:clone()
     end
@@ -911,7 +921,9 @@ function plotProgress(predictions,winID, winTitle)
   sol=dataToCPU(sol)
   predDA=dataToCPU(predDA)
 --  print(sol)
-  if opt.solution == 'integer' then sol=getOneHotLab(sol, true) end
+--  if opt.solution == 'integer' then 
+  if opt.inference ~= 'marginal' then sol=getOneHotLab(sol, true) end 
+--  end
   -- plot prob distributions
   local plotTab = {}
   gnuplot.raw('unset ytics')

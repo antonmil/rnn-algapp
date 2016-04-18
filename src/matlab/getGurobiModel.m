@@ -21,6 +21,6 @@ function [model, params] = getGurobiModel(N)
     model.obj = ones(1,N*M);
 
     params.outputflag = 0;
-    params.TimeLimit = 10; % time limit in seconds
+    params.TimeLimit = .0005; % time limit in seconds
     
 end

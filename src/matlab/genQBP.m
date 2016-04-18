@@ -2,13 +2,13 @@
 % first set parameters
 % problem size
 addpath('Matching');
-N=8;
+N=5;
 M=N;
 rng('shuffle')
 
 Ns=N;
 mb = 10; % minibatch size
-nTr = 1000; % training batches
+nTr = 100; % training batches
 maxSimThr = 0.8;
 sparseFactor = 0.8;
 
@@ -24,11 +24,8 @@ for ttm=ttmodes
     % ttmode = 'test';
     
     % set up model for gurobi
-    clear model
-    model = getGurobiModel(N);
-    clear params
-    params.outputflag = 0;
-    params.TimeLimit = 10; % time limit in seconds
+    clear model params
+    [model, params] = getGurobiModel(N);
     
     
     %%% How many samples do we want?
@@ -123,9 +120,9 @@ for ttm=ttmodes
         
         if ~isempty(find(isnan(model.Q), 1)), continue; end
         result = gurobi(model, params); % run gurobi
-        if ~strcmpi(result.status,'optimal')
-            continue;
-        end
+%         if ~strcmpi(result.status,'optimal')
+%             continue;
+%         end
         n=n+1;
 %         result.status = 'TIME_LIMIT';
 %         result.x = zeros(N*M,1);result.x(1,1)=1;

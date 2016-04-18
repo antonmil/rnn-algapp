@@ -38,7 +38,7 @@ cmd:text('Options')
 -- model params
 cmd:option('-config', '', 'config file')
 cmd:option('-rnn_size', 10, 'size of RNN internal state')
-cmd:option('-model','lstm','module type <RNN|LSTM|GRU>')
+cmd:option('-model','rnn','module type <RNN|LSTM|GRU>')
 cmd:option('-num_layers',1,'number of layers in the RNN / LSTM')
 cmd:option('-max_n',2,'number of rows')
 cmd:option('-max_m',2,'number of columns')
@@ -169,6 +169,7 @@ if not onNetwork() then
   graph.dot(protos.rnn.bg, 'Backw', getRootDir()..'graph/RNNBackwardGraph_AA')
 end
 -------------------------
+abort()
 
 -- the initial state of the cell/hidden states
 init_state = getInitState(opt, opt.mini_batch_size)
