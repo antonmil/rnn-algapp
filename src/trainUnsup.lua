@@ -7,7 +7,7 @@ require 'optim'
 require 'gnuplot'
 require 'lfs'
 require 'image'
-require 'mattorch'
+
 
 torch.setdefaulttensortype('torch.FloatTensor')
 
@@ -49,6 +49,7 @@ cmd:option('-solution','integer','[integer|distribution]')
 cmd:option('-sparse',0,'are the features passed as a sparse matrix?')
 cmd:option('-invert_input',0,'Invert input? (Sutskever et al., 2014)')
 cmd:option('-double_input',0,'Double input? (Zaremba and Sutskever, 2014)')
+cmd:option('-supervised',0,'Supervised or unsupervised learning')
 -- optimization
 cmd:option('-lrng_rate',1e-2,'learning rate')
 cmd:option('-lrng_rate_decay',0.99,'learning rate decay')
@@ -98,6 +99,9 @@ createAuxDirs()
 
 -- augment and fix opt --
 opt = fixOpt(opt)
+if opt.problem == 'quadratic' then 
+  require 'mattorch'
+end
 
 
 --opt.outSize = opt.nClasses
@@ -154,8 +158,11 @@ else
   local mlsm = nn.MultiLabelSoftMarginCriterion()
   protos.criterion = nn.ParallelCriterion()
   if opt.solution == 'integer' then
-    protos.criterion:add(nllc, opt.lambda)
+--     protos.criterion:add(nllc, opt.lambda)
 --    protos.criterion:add(bce, opt.lambda)
+    protos.criterion:add(mse, opt.lambda)
+    protos.criterion:add(mse, opt.lambda)
+    protos.criterion:add(mse, opt.lambda)
   elseif opt.solution == 'distribution' then
     protos.criterion:add(kl, opt.lambda)
 --    protos.criterion:add(bce, opt.lambda)
@@ -262,6 +269,7 @@ function eval_val()
   local tL = tabLen(ValCostTab)
   local loss = 0
   local T = opt.max_n
+  T = 1
   local plotSeq = math.random(tL)
   plotSeq=1
   for seq=1,tL do
@@ -339,6 +347,7 @@ function feval()
   local loss = 0
   local DA = {}
   local T = opt.max_n
+  local T = 1
   local GTDA = {}
   local rnninp = nil
 

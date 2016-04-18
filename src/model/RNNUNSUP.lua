@@ -86,23 +86,20 @@ function RNN.rnn(opt)
 
 
   if dropout > 0 then top_DA_state = nn.Dropout(dropout)(top_DA_state) end
-  local da = nn.Linear(opt.rnn_size, opt.nClasses)(top_DA_state):annotate{
-    name='DA_t',
-    description='data assoc.',
-    graphAttributes = {color='green', style='filled'}
-  }
+  local da = nn.Linear(opt.rnn_size, opt.max_n*opt.max_m)(top_DA_state):annotate{
+    name='DA_t'}
 
 
   --   localDaRes = nn.Reshape(opt.max_n, opt.nClasses, batchMode)(da):annotate{name='Rshp DA'}
-  local localDaRes = nn.Reshape(opt.nClasses, batchMode)(da):annotate{name='Rshp DA'}
+  local localDaRes = nn.Reshape(opt.max_n*opt.max_m, batchMode)(da):annotate{name='Rshp DA'}
 
   local daFinal = localDaRes
 
-  daFinal = nn.LogSoftMax()(localDaRes):annotate{
-    name='DA_t',
-    description='data assoc. LogSoftMax',
-    graphAttributes = {color='green'}
-  }
+--   daFinal = nn.LogSoftMax()(localDaRes):annotate{
+--     name='DA_t',
+--     description='data assoc. LogSoftMax',
+--     graphAttributes = {color='green'}
+--   }
   
 --   daFinal = nn.Sigmoid()(localDaRes)
 

@@ -2,13 +2,14 @@
              rnn_size  64
            num_layers  1
                 max_n  2
-              problem  quadratic
+              problem  linear
             inference  map
              solution  integer
                sparse  0
          invert_input  0
          double_input  0
              exp_cost  1
+           supervised  0
             state_dim  4
            batch_size  1
             loss_type  1
