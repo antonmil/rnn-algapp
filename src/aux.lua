@@ -32,12 +32,13 @@ function fixOpt(opt)
   opt.inSize2 = opt.nClasses  
   if opt.problem == 'quadratic' then opt.inSize2 = opt.max_n*opt.max_n*opt.max_m end
   
---  opt.inSize2 = opt.inSize
+  opt.inSize2 = opt.inSize
   
   opt.solSize = opt.max_n -- integer
   if opt.solution == 'distribution' then
     opt.solSize = opt.max_n*opt.max_m -- one hot (or full)
   end
+  if opt.supervised == 0 then opt.solSize =opt.max_n*opt.max_m end 
   
   opt.featmat_n, opt.featmat_m = opt.max_n, opt.max_m
   if opt.problem == 'quadratic' then 
@@ -172,13 +173,17 @@ function genHunData(nSamples)
     end
     table.insert(CostTab, oneCost)
 
-    local hunSols = torch.ones(1,opt.max_n):int()
-    for m=1,opt.mini_batch_size do
-      local costMat = oneCost[m]:reshape(opt.max_n, opt.max_m)
-      local ass = hungarianL(-costMat) -- treat as similarity
-      hunSols = hunSols:cat(ass[{{},{2}}]:reshape(1,opt.max_n):int(), 1)
-    end
-    hunSols=hunSols:sub(2,-1)
+    local hunSols = torch.ones(opt.mini_batch_size,opt.max_n):int() 
+--    if opt.supervised == 1 then
+      hunSols = torch.ones(1,opt.max_n):int()
+      for m=1,opt.mini_batch_size do
+        local costMat = oneCost[m]:reshape(opt.max_n, opt.max_m)
+        local ass = hungarianL(-costMat) -- treat as similarity
+        hunSols = hunSols:cat(ass[{{},{2}}]:reshape(1,opt.max_n):int(), 1)
+      end
+      hunSols=hunSols:sub(2,-1)
+--    end
+    
     hunSols = dataToGPU(hunSols)
     table.insert(HunTab, hunSols)
   end
@@ -632,6 +637,8 @@ function getRNNInput(t, rnn_state, predictions)
 
   -- Cost matrix
   local loccost = costs:clone():reshape(opt.mini_batch_size, opt.inSize)
+--  print(loccost)
+--  if opt.supervised == 0 then loccost = dataToGPU(torch.ones(loccost:size())) - loccost end
   if opt.inSize2~=opt.inSize then
 --    print(t)
 --    print(loccost)
@@ -691,19 +698,39 @@ end
 -- @param predictions current predictions to use for feed back
 -- @param t   time step (nil to predict for entire sequence)
 function decode(predictions, tar)
-  local DA = {}
+  local DA, sol, c1, c2 = {}, {}, {}, {}
   local T = tabLen(predictions) -- how many targets
+  local stepSolSize = opt.nClasses
+  if opt.supervised == 0 then stepSolSize = 1 end
   if tar ~= nil then
     local lst = predictions[tar]
-    DA = lst[opt.daPredIndex]:reshape(opt.mini_batch_size, opt.nClasses) -- opt.mini_batch_size*opt.max_n x opt.max_m
+--    print(lst)
+--    print(stepSolSize)
+--    print(opt.outSize)
+    DA = lst[opt.daPredIndex]:reshape(opt.mini_batch_size, stepSolSize) -- opt.mini_batch_size*opt.max_n x opt.max_m
+    if opt.supervised == 0 then 
+      sol = lst[opt.solPredIndex]:reshape(opt.mini_batch_size, opt.solSize) 
+      c1 = lst[opt.c1PredIndex]:reshape(opt.mini_batch_size, opt.c1Size)
+      c2 = lst[opt.c2PredIndex]:reshape(opt.mini_batch_size, opt.c2Size)
+    end
   else
-    DA = zeroTensor3(opt.mini_batch_size,T,opt.nClasses)
+    DA = zeroTensor3(opt.mini_batch_size,T,stepSolSize)
+    if supervised == 0 then
+      sol = zeroTensor3(opt.mini_batch_size,T,opt.solSize)
+      c1 = zeroTensor3(opt.mini_batch_size,T,opt.c1Size)
+      c2 = zeroTensor3(opt.mini_batch_size,T,opt.c2Size)
+    end
     for tt=1,T do
       local lst = predictions[tt]
-      DA[{{},{tt},{}}] = lst[opt.daPredIndex]:reshape(opt.mini_batch_size, 1, opt.nClasses)
+      DA[{{},{tt},{}}] = lst[opt.daPredIndex]:reshape(opt.mini_batch_size, 1, stepSolSize)      
+      if opt.supervised == 0 then
+        sol[{{},{tt},{}}] = lst[opt.solPredIndex]:reshape(opt.mini_batch_size, 1, opt.solSize)
+        c1[{{},{tt},{}}] = lst[opt.c1PredIndex]:reshape(opt.mini_batch_size, 1, opt.c1Size)
+        c2[{{},{tt},{}}] = lst[opt.c2PredIndex]:reshape(opt.mini_batch_size, 1, opt.c2Size)
+      end
     end
   end
-  return DA
+  return DA, sol, c1, c2
 end
 
 function getDebugTableTitle(str)
@@ -733,7 +760,9 @@ function printDebugValues(C, Pred)
   -- sol is the solution matrix (binary or distribution)
   local sol = huns:sub(1,1)
   if opt.solution=='integer' then sol=getOneHotLab(sol, true)
-  else sol=sol:reshape(N,M)
+  else
+--    print(sol) 
+    sol=sol:reshape(N,M)
   end  
   sol=dataToCPU(sol)
   
@@ -879,8 +908,14 @@ end
 
 function plotProgress(predictions,winID, winTitle)
   local mm=0 -- number of mismatches
-  local logpredDA = decode(predictions):reshape(opt.mini_batch_size*opt.max_n,opt.nClasses):sub(1,opt.max_n)  
-  local predDA=costToProb(-logpredDA)
+--  print(opt.daPredIndex)
+  local predDA = nil  
+  if opt.supervised == 0 then 
+    predDA = predictions[1][opt.daPredIndex+1]:reshape(opt.mini_batch_size*opt.max_n,opt.nClasses):sub(1,opt.max_n)
+  else
+    local logpredDA = decode(predictions):reshape(opt.mini_batch_size*opt.max_n,opt.nClasses):sub(1,opt.max_n)  
+    predDA=costToProb(-logpredDA)    
+  end
   local predAsTracks = predDA:reshape(opt.max_n, opt.max_m, 1)
   
 --  print(huns)
@@ -943,6 +978,7 @@ function plotProgressD(predictions,winID, winTitle)
   
 --  local logpredDA = decode(predictions):reshape(opt.mini_batch_size*opt.max_n*opt.max_m,1):sub(1,opt.max_n)
   local predDA=costToProb(-logpredDA)
+  
 --  print(predDA)
   local predAsTracks = predDA:reshape(opt.max_n, opt.max_m, 1)
   

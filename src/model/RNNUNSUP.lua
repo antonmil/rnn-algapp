@@ -86,14 +86,26 @@ function RNN.rnn(opt)
 
 
   if dropout > 0 then top_DA_state = nn.Dropout(dropout)(top_DA_state) end
-  local da = nn.Linear(opt.rnn_size, opt.max_n*opt.max_m)(top_DA_state):annotate{
-    name='DA_t'}
+  local da = nn.Linear(opt.rnn_size, opt.solSize)(top_DA_state):annotate{name='DA_t'}
+  local sigDA = nn.Sigmoid()(da)
+  local solMatrix = nn.Reshape(opt.max_n, opt.max_m, batchMode)(sigDA)
+  local obj = nil
+  if opt.problem == 'linear' then
+    obj = nn.DotProduct(){inputs[1], sigDA}
+  elseif opt.problem == 'quadratic' then
+    local costMat = nn.Reshape(opt.max_n*opt.max_n, opt.max_m*opt.max_m, batchMode)(inputs[1])    
+    obj = nn.MM(){costMat, nn.Reshape(opt.solSize, 1, batchMode)(sigDA)}
+    obj = nn.DotProduct(){sigDA, nn.Reshape(opt.solSize, batchMode)(obj)}
+  end 
+  
+  local constr1 = nn.Sum(1, 2)(solMatrix)
+  local constr2 = nn.Sum(2, 2)(solMatrix)
 
 
   --   localDaRes = nn.Reshape(opt.max_n, opt.nClasses, batchMode)(da):annotate{name='Rshp DA'}
-  local localDaRes = nn.Reshape(opt.max_n*opt.max_m, batchMode)(da):annotate{name='Rshp DA'}
+--  local localDaRes = nn.Reshape(1, batchMode)(obj):annotate{name='Rshp DA'}
 
-  local daFinal = localDaRes
+  local daFinal = obj
 
 --   daFinal = nn.LogSoftMax()(localDaRes):annotate{
 --     name='DA_t',
@@ -110,6 +122,9 @@ function RNN.rnn(opt)
 
 
   table.insert(outputs,daFinal)
+  table.insert(outputs,sigDA)
+  table.insert(outputs,constr1)
+  table.insert(outputs,constr2)
   --   if daLoss then table.insert(outputs,nn.Identity()(daFinal)) end
 
 

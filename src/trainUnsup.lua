@@ -13,7 +13,7 @@ torch.setdefaulttensortype('torch.FloatTensor')
 
 local model_utils = require 'util.model'    -- model specific utils
 require 'util.misc'   -- all the rest
-local RNN = require 'model.RNN'
+local RNN = require 'model.RNNUNSUP'
 
 -- project specific auxiliary functions
 require 'aux'
@@ -38,11 +38,12 @@ cmd:text('Options')
 -- model params
 cmd:option('-config', '', 'config file')
 cmd:option('-rnn_size', 10, 'size of RNN internal state')
-cmd:option('-model','rnn','module type <RNN|LSTM|GRU>')
+cmd:option('-model','lstm','module type <RNN|LSTM|GRU>')
 cmd:option('-num_layers',1,'number of layers in the RNN / LSTM')
 cmd:option('-max_n',2,'number of rows')
 cmd:option('-max_m',2,'number of columns')
 cmd:option('-lambda',1,'loss weighting')
+cmd:option('-mu',100,'constraint weighting')
 cmd:option('-problem','quadratic','[linear|quadratic]')
 cmd:option('-inference','map','[map|marginal]')
 cmd:option('-solution','integer','[integer|distribution]')
@@ -110,7 +111,15 @@ end
 opt.nHiddenInputs = 1
 if opt.model=='lstm' then opt.nHiddenInputs = 2 end
 opt.daPredIndex = opt.num_layers*opt.nHiddenInputs+1
+opt.solPredIndex = opt.daPredIndex + 1
+opt.c1PredIndex = opt.solPredIndex + 1
+opt.c2PredIndex = opt.solPredIndex + 2
 print('da index     '..opt.daPredIndex)
+print('sol index     '..opt.solPredIndex)
+print('c1 index     '..opt.c1PredIndex)
+print('c2 index     '..opt.c2PredIndex)
+opt.c1Size = opt.max_n
+opt.c2Size = opt.max_m
 
 modelName = 'default'   -- base name
 if string.len(opt.config)>0 then
@@ -160,11 +169,15 @@ else
   if opt.solution == 'integer' then
 --     protos.criterion:add(nllc, opt.lambda)
 --    protos.criterion:add(bce, opt.lambda)
-    protos.criterion:add(mse, opt.lambda)
-    protos.criterion:add(mse, opt.lambda)
-    protos.criterion:add(mse, opt.lambda)
+--    protos.criterion:add(mse, opt.lambda)
+--    protos.criterion:add(mse, opt.lambda)
+--    protos.criterion:add(mse, opt.lambda)
   elseif opt.solution == 'distribution' then
-    protos.criterion:add(kl, opt.lambda)
+    protos.criterion:add(abserr, opt.lambda) -- cost
+    protos.criterion:add(abserr, opt.lambda*0) -- solution (no gradient)
+    protos.criterion:add(abserr, opt.mu) -- constraints 1
+    protos.criterion:add(abserr, opt.mu) -- constraints 2
+--    protos.criterion:add(kl, opt.lambda)
 --    protos.criterion:add(bce, opt.lambda)
   end
 end
@@ -176,7 +189,7 @@ if not onNetwork() then
   graph.dot(protos.rnn.bg, 'Backw', getRootDir()..'graph/RNNBackwardGraph_AA')
 end
 -------------------------
-abort()
+--abort()
 
 -- the initial state of the cell/hidden states
 init_state = getInitState(opt, opt.mini_batch_size)
@@ -203,11 +216,13 @@ end
 print('number of parameters in the model: ' .. params:nElement())
 
 -- make a bunch of clones after flattening, as that reallocates memory
-pm('Cloning '..opt.max_n..' times...',2)
+local T = opt.max_n
+T = 1
+pm('Cloning '..T..' times...',2)
 clones = {}
 for name,proto in pairs(protos) do
   print('\tcloning ' .. name)
-  clones[name] = model_utils.clone_many_times(proto, opt.max_n, not proto.parameters)
+  clones[name] = model_utils.clone_many_times(proto, T, not proto.parameters)
 end
 pm('   ...done',2)
 
@@ -236,29 +251,59 @@ function getGTDA(tar)
   local DA = nil
 
 
-  if opt.solution == 'integer' then
-    -- integer
-    DA = huns[{{},{tar}}]:reshape(opt.mini_batch_size)
-  elseif opt.solution == 'distribution' then
-    -- one hot (or full prob distr.)
-    local offset = opt.max_n * (tar-1)+1
-    DA = huns[{{},{offset, offset+opt.max_n-1}}]
-  end
+--  if opt.solution == 'integer' then
+--    -- integer
+--    DA = huns[{{},{tar}}]:reshape(opt.mini_batch_size)
+--  elseif opt.solution == 'distribution' then
+--    -- one hot (or full prob distr.)
+--    local offset = opt.max_n * (tar-1)+1
+--    DA = huns[{{},{offset, offset+opt.max_n-1}}]
+--  end
     
 --  local offset = opt.max_n * (tar-1)+1
---  DA = huns[{{},{offset, offset+opt.max_n-1}}]  
+
+--  DA = huns:clone()
+  DA = torch.ones(opt.mini_batch_size,1) * opt.max_n
+--  DA = torch.zeros(opt.mini_batch_size,1)
+  
+  DA = dataToGPU(DA)
 
   return DA
 end
 
+function getConstr()
+  local c1, c2 = {}, {}
+  c1 = torch.ones(opt.mini_batch_size, opt.c1Size)
+  c2 = torch.ones(opt.mini_batch_size, opt.c2Size)
+  c1=dataToGPU(c1)
+  c2=dataToGPU(c2)
+  return c1, c2
+end
 
-function getPredAndGTTables(predDA, tar)
+
+function getPredAndGTTables(tar, predDA, predSol, predConstr1, predConstr2)
   local input, output = {}, {}
 
   local GTDA = getGTDA(tar)
+  
   table.insert(input, predDA)
   table.insert(output, GTDA)
 
+  table.insert(input, predSol)
+  table.insert(output, predSol)
+
+  local constr1, constr2 = getConstr()
+  table.insert(input, predConstr1)
+  table.insert(output, constr1)
+
+  table.insert(input, predConstr2)
+  table.insert(output, constr2)
+
+
+--  print(input)
+--  print(predSol)
+--  abort()
+  
   return input, output
 end
 
@@ -283,7 +328,7 @@ function eval_val()
     --   local predictions = {[0] = {[opt.updIndex] = detections[{{},{t}}]}}
     local predictions = {}
     --     local loss = 0
-    local DA = {}
+    local DA, sol, c1, c2 = {}, {}, {}, {}
 
     local GTDA = {}
 
@@ -298,9 +343,9 @@ function eval_val()
 
       rnn_state[t] = {}
       for i=1,#init_state do table.insert(rnn_state[t], lst[i]) end -- extract the state, without output
-      DA[t] = decode(predictions, t)
+      DA[t], sol[t], c1[t], c2[t] = decode(predictions, t)
       --     print(DA[t])
-      local input, output = getPredAndGTTables(DA[t], t)
+      local input, output = getPredAndGTTables(t, DA[t], sol[t], c1[t], c2[t])
 
       local tloss = clones.criterion[t]:forward(input, output)
 
@@ -345,35 +390,50 @@ function feval()
   --   local predictions = {[0] = {[opt.updIndex] = detections[{{},{t}}]}}
   local predictions = {}
   local loss = 0
-  local DA = {}
+  local DA, sol, c1, c2 = {}, {}, {}, {}
   local T = opt.max_n
   local T = 1
   local GTDA = {}
   local rnninp = nil
+  local dispLength = 5
+--  print(params:size())
+--  print(grad_params:size())
 
   for t=1,T do
     clones.rnn[t]:training()      -- set flag for dropout
+--    print(params:sub(1,dispLength))
+--    print(grad_params:sub(1,dispLength))
+    
     rnninp, rnn_state = getRNNInput(t, rnn_state, predictions)    -- get combined RNN input table
     local lst = clones.rnn[t]:forward(rnninp) -- do one forward tick
+--    print(params:sub(1,dispLength))
+--    print(grad_params:sub(1,dispLength))
+--    abort()
     predictions[t] = lst
-    --         print(lst)
-    --         abort()
+--             print(lst)
+--             abort()
 
     --    print(rnninp[1])
     rnn_state[t] = {}
     for i=1,#init_state do table.insert(rnn_state[t], lst[i]) end -- extract the state, without output
-    DA[t] = decode(predictions, t)
-    --         print(DA[t])
-    --         abort()
-    local input, output = getPredAndGTTables(DA[t], t)
+    DA[t], sol[t], c1[t], c2[t] = decode(predictions, t)
+--             print(DA[t])
+--             abort()
+    local input, output = getPredAndGTTables(t, DA[t], sol[t], c1[t], c2[t])
 --        print(input[1])
 --        print(output[1])
-    --    abort()
+--        abort()
+--print(input)
+--print(output)
 
     local tloss = clones.criterion[t]:forward(input, output)
+--    print(params:sub(1,dispLength))
+--    print(grad_params:sub(1,dispLength))
+--    abort()
+    
     loss = loss + tloss
-    --    print(tloss)
-    --    abort()
+--        print(tloss)
+--        abort()
   end
   loss = loss / T -- make average over all frames
   local predDA = decode(predictions)
@@ -395,8 +455,12 @@ function feval()
   -- gradient at final frame is zero
   local drnn_state = {[T] = clone_list(init_state, true)} -- true = zero the clones
   for t=T,1,-1 do
-    local input, output = getPredAndGTTables(DA[t], t)
+    local input, output = getPredAndGTTables(t, DA[t], sol[t], c1[t], c2[t])
     local dl = clones.criterion[t]:backward(input,output)
+
+--    print(params:sub(1,dispLength))
+--    print(grad_params:sub(1,dispLength))
+--    abort()    
     local nGrad = #dl
 
     for dd=1,nGrad do
@@ -406,6 +470,9 @@ function feval()
     local rnninp = getRNNInput(t, rnn_state, predictions)    -- get combined RNN input table
 
     dlst = clones.rnn[t]:backward(rnninp, drnn_state[t])
+--    print(params:sub(1,dispLength))
+--    print(grad_params:sub(1,dispLength))
+--    abort()    
 
     drnn_state[t-1] = {}
     local maxk = opt.num_layers+1
@@ -420,6 +487,7 @@ function feval()
     -- TODO transfer final state?    
 
   end
+--  grad_params = grad_params:cdiv(params * 2) 
   grad_params:clamp(-opt.grad_clip, opt.grad_clip)
   
   --   feval_mm = 0

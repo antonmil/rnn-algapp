@@ -79,8 +79,12 @@ if opt.problem == 'quadratic' then
   if opt.inference == 'marginal' then 
     ValSolTab = computeMarginals(ValCostTab)
   elseif opt.inference == 'map' then
+    if opt.solution == 'integer' then
 --    ValSolTab[1] =torch.linspace(1,opt.max_n,opt.max_n):reshape(1,opt.max_n)
-    ValSolTab[1] = loaded.allSolInt:t()
+      ValSolTab[1] = loaded.allSolInt:t()
+    elseif opt.solution == 'distribution' then
+      ValSolTab[1] = loaded.allSol:t()
+    end
   end 
 end
 --print(ValCostTab[1]:view(opt.max_n,opt.max_m))
@@ -95,7 +99,7 @@ ValCostTab = prepData(ValCostTab)
 --  _,_,ValProbTab,ValSolTab = readQBPData('test')
 --end
 
-local nthSample=1
+local nthSample=2
 
 
 
@@ -144,9 +148,15 @@ for t=1,T do
   DA[t] = decode(predictions, t)
 
 end
-
-local predDA = decode(predictions):reshape(opt.max_n,opt.nClasses)
-predDA=costToProb(-predDA)
+if opt.supervised == 0 then 
+  predDA = predictions[1][opt.daPredIndex+1]:reshape(opt.mini_batch_size*opt.max_n,opt.nClasses):sub(1,opt.max_n)
+else
+  local logpredDA = decode(predictions):reshape(opt.mini_batch_size*opt.max_n,opt.nClasses):sub(1,opt.max_n)  
+  predDA=costToProb(-logpredDA)    
+end
+  
+--local predDA = decode(predictions):reshape(opt.max_n,opt.nClasses)
+--predDA=costToProb(-predDA)
 
 local pmaxv,pmaxi = torch.max(predDA,2)
 local oneHotPred = getOneHotLab(pmaxi, true, opt.max_m)

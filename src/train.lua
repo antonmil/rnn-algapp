@@ -49,6 +49,7 @@ cmd:option('-solution','integer','[integer|distribution]')
 cmd:option('-sparse',0,'are the features passed as a sparse matrix?')
 cmd:option('-invert_input',0,'Invert input? (Sutskever et al., 2014)')
 cmd:option('-double_input',0,'Double input? (Zaremba and Sutskever, 2014)')
+cmd:option('-supervised',1,'Supervised or unsupervised learning')
 -- optimization
 cmd:option('-lrng_rate',1e-2,'learning rate')
 cmd:option('-lrng_rate_decay',0.99,'learning rate decay')
@@ -98,7 +99,7 @@ createAuxDirs()
 
 -- augment and fix opt --
 opt = fixOpt(opt)
-
+opt.supervised=1
 
 --opt.outSize = opt.nClasses
 

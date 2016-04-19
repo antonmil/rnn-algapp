@@ -2,9 +2,12 @@
 addpath(genpath('.'))
 nRuns = 10;
 
+
 N=5;
+rnnSize = 32;
+numLayers = 1;
 [gurModel, gurParams] = getGurobiModel(N);
-model_sign = sprintf('mt1_r128_l3_n%d_m%d_o2_s1_i1',N,N);
+model_sign = sprintf('mt1_r%d_l%d_n%d_m%d_o2_s2_i1',rnnSize, numLayers, N,N);
 model_name = 'trainHun';
 
 runInfos.allAcc=zeros(1,nRuns);
