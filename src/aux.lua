@@ -32,7 +32,7 @@ function fixOpt(opt)
   opt.inSize2 = opt.nClasses  
   if opt.problem == 'quadratic' then opt.inSize2 = opt.max_n*opt.max_n*opt.max_m end
   
-  opt.inSize2 = opt.inSize
+--  opt.inSize2 = opt.inSize
   
   opt.solSize = opt.max_n -- integer
   if opt.solution == 'distribution' then
@@ -46,7 +46,8 @@ function fixOpt(opt)
   end
 
   if opt.double_input ~= 0 then  
-    opt.inSize=opt.inSize*2
+    opt.inSize = opt.inSize*2
+    opt.inSize2 = opt.inSize2*2
     opt.featmat_n = opt.featmat_n*2
     opt.featmat_m = opt.featmat_m*2
   end
@@ -518,9 +519,9 @@ function prepData(tab)
   pm('normalizing...')
   tab = normalizeCost(tab)
 
-  if opt.double_input ~= 0 then
-    for k,v in pairs(tab) do tab[k] = v:cat(v,2) end    
-  end
+--  if opt.double_input ~= 0 then
+--    for k,v in pairs(tab) do tab[k] = v:cat(v,2) end    
+--  end
 
   if opt.invert_input ~= 0 then
     local invInd = torch.linspace(opt.inSize,1,opt.inSize):long()
@@ -636,20 +637,35 @@ function getRNNInput(t, rnn_state, predictions)
   local rnninp = {}
 
   -- Cost matrix
-  local loccost = costs:clone():reshape(opt.mini_batch_size, opt.inSize)
+  local loccost = nil
+  
+  if opt.double_input ~= 0 then
+    loccost = costs:reshape(opt.mini_batch_size,opt.inSize/2,1):expand(opt.mini_batch_size,opt.inSize/2,2):transpose(2,3):reshape(opt.mini_batch_size,opt.inSize)
+  else
+    loccost = costs:clone():reshape(opt.mini_batch_size, opt.inSize)
+  end
+  
+--  print(opt.inSize, opt.inSize2)
 --  print(loccost)
 --  if opt.supervised == 0 then loccost = dataToGPU(torch.ones(loccost:size())) - loccost end
   if opt.inSize2~=opt.inSize then
 --    print(t)
 --    print(loccost)
     local from = (t-1)*opt.inSize2+1
---    print(t,from)
+--    print(t,from,opt.inSize, opt.inSize2)
 --    print(loccost:narrow(2,from,opt.inSize2))
     
     loccost = loccost:narrow(2,from,opt.inSize2)
     
 --    abort()
   end
+--  print(costs:size()) 
+--  print(loccost:size())
+--  print(loccost)
+--  print(opt.inSize)
+--  print(loccost:size())
+--  print(loccost)
+--  abort()
   --  loccost = probToCost(loccost)
   table.insert(rnninp, loccost)
 

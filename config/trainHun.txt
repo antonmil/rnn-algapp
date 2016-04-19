@@ -1,15 +1,15 @@
           model_index  1
              rnn_size  512
            num_layers  4
-                max_n  5
+                max_n  10
               problem  quadratic
             inference  map
-             solution  distribution
+             solution  integer
                sparse  0
          invert_input  0
-         double_input  0
+         double_input  1
              exp_cost  1
-           supervised  0
+           supervised  1
             state_dim  4
            batch_size  1
             loss_type  1
@@ -48,7 +48,7 @@
           print_every  100
        eval_val_every  1000
            plot_every  1000
-              dropout  0.1
+              dropout  0.5
              temp_win  4
            suppress_x  0
               verbose  2

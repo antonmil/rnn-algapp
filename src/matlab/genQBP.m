@@ -2,13 +2,13 @@
 % first set parameters
 % problem size
 addpath('Matching');
-N=5;
+N=10;
 M=N;
 rng('shuffle')
 
 Ns=N;
 mb = 10; % minibatch size
-nTr = 100; % training batches
+nTr = 1000; % training batches
 maxSimThr = 0.8;
 sparseFactor = 0.8;
 

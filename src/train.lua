@@ -98,8 +98,8 @@ createAuxDirs()
 
 
 -- augment and fix opt --
-opt = fixOpt(opt)
 opt.supervised=1
+opt = fixOpt(opt)
 
 --opt.outSize = opt.nClasses
 
@@ -525,7 +525,7 @@ for i = 1, opt.max_epochs do
     end
       
     -- heuristic: abort if no val. loss decrease for 3 last outputs
-    if ((i - minValidLossIt) > 5*opt.eval_val_every) then
+    if ((i - minValidLossIt) > 6*opt.eval_val_every) then
       print('Validation loss has stalled. Maybe overfitting. Stop.')
       break
     end

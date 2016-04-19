@@ -30,7 +30,7 @@ torch.manualSeed(sopt.seed)
 
 sopt.model = getRootDir()..'bin/'..sopt.model_name
 if sopt.model_sign ~= '' then sopt.model = sopt.model..'_'..sopt.model_sign end
-sopt.model = sopt.model..'.t7'
+sopt.model = sopt.model..'_val.t7'
 
 
 checkFileExist(sopt.model,'model file')
@@ -45,7 +45,7 @@ opt = checkpoint.opt
 ------ Change some options for testing
 opt.mini_batch_size = 1
 opt.gpuid=-1
-opt.synth_training, opt.synth_valid = 2,2
+opt.synth_training, opt.synth_valid = 2,10
 opt.suppress_x = sopt.suppress_x
 
 init_state = getInitState(opt, miniBatchSize)
@@ -99,7 +99,7 @@ ValCostTab = prepData(ValCostTab)
 --  _,_,ValProbTab,ValSolTab = readQBPData('test')
 --end
 
-local nthSample=2
+local nthSample=5
 
 
 
@@ -160,7 +160,7 @@ end
 
 local pmaxv,pmaxi = torch.max(predDA,2)
 local oneHotPred = getOneHotLab(pmaxi, true, opt.max_m)
-
+--print(oneHotPred)
 --local costs = torch.rand(3,3)
 --print(opt.inSize)
 --print(predDA)
