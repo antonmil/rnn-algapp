@@ -212,9 +212,10 @@ end
 
 
 
-local cmdstr = string.format('sh genData.sh %d %d %d %d',opt.max_n, opt.mini_batch_size, opt.synth_training,1) 
-print(cmdstr)
-os.execute(cmdstr)
+--local mBst = 1
+--local cmdstr = string.format('sh genData.sh %d %d %d %d',opt.max_n, opt.mini_batch_size, opt.synth_training,mBst) 
+--print(cmdstr)
+--os.execute(cmdstr)
 getData(opt, true, true)
 
 
@@ -433,6 +434,7 @@ train_mm, val_mm, real_mm = {}, {}, {}
 train_ma, val_ma, real_ma = {}, {}, {}
 mot15_mota = {}
 mot15_mota_nopos = {}
+local mBstMar = 0
 local optim_state = {learningRate = opt.lrng_rate, alpha = opt.decay_rate}
 local glTimer = torch.Timer()
 for i = 1, opt.max_epochs do
@@ -441,6 +443,15 @@ for i = 1, opt.max_epochs do
   
 --  if i>1 and (i-1)%opt.synth_training==0 and opt.random_epoch~=0 then
 
+  -- replace GT
+  if i == 1 or (i-1)%opt.synth_training == 0 then
+    mBstMar = mBstMar + 1
+    if mBstMar>10 then mBstMar = 1 end
+    pm('Replacing GT with '.. mBstMar .. '-best Marginals')
+    local mBstField = string.format('all_%d_BestMarginals',mBstMar)
+    for k,v in pairs(TrSolTab_m_BestMarginals[mBstMar]) do TrSolTab[k] = v end
+--    for k,v in pairs(TrSolTab_m_BestMarginals[mBst]) do TrSolTab[k] = v end
+  end
 
   local timer = torch.Timer()
   local _, loss = optim.rmsprop(feval, params, optim_state)
@@ -511,7 +522,6 @@ for i = 1, opt.max_epochs do
     minRealLoss=minRealLoss:squeeze()
     minRealLossIt=minRealLossIt:squeeze()*opt.eval_val_every
 
-    -- TODO there is a bug in best training loss and best training DA
     pm('--------------------------------------------------------')
     pm(string.format('%10s%10s%10s%10s','Losses','Training','Valid','Real'))
     pm(string.format('%10s%10.5f%10.5f%10.5f','Current',plot_loss[-1],val_loss,real_loss))
@@ -521,20 +531,32 @@ for i = 1, opt.max_epochs do
 
     -- check if we started overfitting
     -- first try generating new data
-    if ((i - minValidLossIt) > 2*opt.eval_val_every) and ((i - minValidLossIt) <= 6*opt.eval_val_every) and opt.random_epoch~=0 then
-      if opt.problem == 'quadratic' then
-        -- call matlab to generate new data
-        local cmdstr = string.format('sh genData.sh %d %d %d',opt.max_n, opt.mini_batch_size, opt.synth_training) 
-        os.execute(cmdstr) 
-      end
-      getData(opt, true, false)
-    end
+--    if ((i - minValidLossIt) > 2*opt.eval_val_every) and ((i - minValidLossIt) <= 6*opt.eval_val_every) and opt.random_epoch~=0 then
+--      if opt.problem == 'quadratic' then
+--        -- call matlab to generate new data
+--        local cmdstr = string.format('sh genData.sh %d %d %d',opt.max_n, opt.mini_batch_size, opt.synth_training) 
+--        os.execute(cmdstr) 
+--      end
+--      getData(opt, true, false)
+--    end
       
     -- heuristic: abort if no val. loss decrease for 3 last outputs
     if ((i - minValidLossIt) > 6*opt.eval_val_every) then
-      print('Validation loss has stalled. Maybe overfitting. Stop.')
-      break
+--      print('Validation loss has stalled. Maybe overfitting. Stop.')
+--      break
     end
+
+        
+--    if ((i - minValidLossIt) > 2*opt.eval_val_every) then
+      -- experiment with iterative GT refinement
+--      local mBst = i/opt.eval_val_every + 1
+--      mBst = mBst + 1
+--      print('Now generate marginals with '..mBst..' mBst approximation')
+--      local cmdstr = string.format('sh genData.sh %d %d %d %d',opt.max_n, opt.mini_batch_size, opt.synth_training,mBst) 
+--      print(cmdstr)
+--      os.execute(cmdstr)
+--      getData(opt, true, true)
+--    end    
     
     local minTrainLoss, minTrainLossIt = torch.min(plot_train_mm,1)
     local minValidLoss, minValidLossIt = torch.min(plot_val_mm,1)
@@ -602,13 +624,7 @@ for i = 1, opt.max_epochs do
 
     printModelOptions(opt, modelParams) -- print parameters
 
-    -- experiment with iterative GT refinement
-    local mBst = i/opt.eval_val_every
-    print('Now generate marginals with '..mBst..' mBst approximation')
-    local cmdstr = string.format('sh genData.sh %d %d %d %d',opt.max_n, opt.mini_batch_size, opt.synth_training,mBst) 
-    print(cmdstr)
-    os.execute(cmdstr)
-    getData(opt, true, true)
+
   end
 
   if (i == 1 or i % (opt.print_every*10) == 0) and i<opt.max_epochs then

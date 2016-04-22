@@ -8,6 +8,16 @@ function writeQBP(ttmode, N, M, fname, data,n,dv)
     allSolInt = data.allSolInt(1:n,:);
     allMarginals = data.allMarginals(1:n,:);
     
+    % look for all_m_BestMarginal fields
+    fields = fieldnames(data);
+    for f=fields'
+        cf = char(f);
+        if strfind(cf,'all_')
+            assignStr = sprintf('%s = data.%s(1:n, :);',cf,cf);
+            eval(assignStr);
+        end
+    end
+    
     if nargin<7, dv = datevec(now); end
     
     if isempty(dv), filename = sprintf('../../data/%s/%s_N%d_M%d',ttmode,fname,N,M); 
@@ -18,7 +28,7 @@ function writeQBP(ttmode, N, M, fname, data,n,dv)
     
     
 %     dlmwrite([filename,'.txt'],data);
-    save([filename,'.mat'],'allQ','allSparseQ','allnnz','allc','allSol','allSolInt','allMarginals','-v7.3');
+    save([filename,'.mat'],'all*','-v7.3');
     
 %     fprintf('\n');
 end

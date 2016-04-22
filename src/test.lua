@@ -95,7 +95,7 @@ end
 --print(ValCostTab[1]:view(opt.max_n,opt.max_m))
 ValCostTab = prepData(ValCostTab)
 --print(ValCostTab[1])
-print(ValSolTab[1])
+--print(ValSolTab[1])
 --abort()
 
 --if opt.problem == 'linear' then

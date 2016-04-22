@@ -1,4 +1,4 @@
-function asgIpfpSMbst = mBestIPFP(K, Mbst)
+function [asgIpfpSMbst, allMarginals] = mBestIPFP(K, Mbst)
 %%
 % Mbest parameters
 if nargin<2, Mbst=20; end
@@ -20,6 +20,15 @@ par_mb{1,3}.chck_sols=param.chck_sols;
 
 % tIpfp = tic;
 asgIpfpSMbst = gm(K, Ct, asgT, par_mb{:});
+
+allMarginals{Mbst} = asgIpfpSMbst.marginals;
+if nargout>1
+    for m=1:Mbst-1
+        par_mb{1,3}.mbst=m;
+        asgIpfpSMbst = gm(K, Ct, asgT, par_mb{:});
+        allMarginals{m} = asgIpfpSMbst.marginals;
+    end
+end
 % tm(11) = toc(tIpfp);    
 % acc(11) = asgIpfpSMbst.acc;
 % obj(11) = 0;

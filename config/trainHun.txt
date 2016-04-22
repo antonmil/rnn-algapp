@@ -1,7 +1,7 @@
           model_index  1
-             rnn_size  64
-           num_layers  2
-                max_n  10
+             rnn_size  128
+           num_layers  4
+                max_n  7
               problem  quadratic
             inference  marginal
              solution  distribution

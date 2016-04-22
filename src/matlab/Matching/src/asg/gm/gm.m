@@ -64,6 +64,7 @@ if strcmp(parPosD.alg,'ipfp_mbst')
     
     for i=1:parPosD.mbst
         Probability = Probability+Xm(:,:,i).* xvs(i);
+%         asg.mBstMarginals{i} = Probability;
     end
     
     [~, idxs] = max(Probability,[],2);

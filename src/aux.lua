@@ -265,7 +265,7 @@ end
 
 --------------------------------------------------------------------------
 --- read QBP data and solutions
-function readQBPData(ttmode)
+function readQBPData(ttmode, mBst)
   local inSize = opt.inSize
   if opt.double_input ~= 0 then opt.inSize =opt.inSize/2 end 
 
@@ -304,6 +304,14 @@ function readQBPData(ttmode)
     checkFileExist(Solfile,'solution file')
     local loaded = mattorch.load(Solfile)
     allSol = loaded.allMarginals:t() -- transpose because Matlab is first-dim-major
+--    print(allSol[1]:sub(1,7))
+    if mBst ~= nil then
+      local mBstField = string.format('all_%d_BestMarginals',mBst)
+      allSol = loaded[mBstField]:t() -- transpose because Matlab is first-dim-major
+--      print(allSol[1]:sub(1,7))
+--      abort()
+       -- transpose because Matlab is first-dim-major
+    end
   end
   
   allQ=allQ:float()
@@ -389,6 +397,106 @@ function readQBPData(ttmode)
   opt.inSize = inSize
   return ProbTab, SolTab, ValProbTab, ValSolTab
 end
+
+--------------------------------------------------------------------------
+--- read QBP data and solutions
+function readQBPallMBstMarginals(ttmode, mBst)
+  local inSize = opt.inSize
+  if opt.double_input ~= 0 then opt.inSize =opt.inSize/2 end 
+
+  if ttmode ==nil or (ttmode~='train' and ttmode~='test') then ttmode = 'train' end
+
+  local SolTab = {},{}
+  local ValSolTab = {},{}
+
+  
+  local Solfile = string.format('%sdata/%s/QBP_N%d_M%d.mat',getRootDir(), ttmode, opt.max_n, opt.max_m);
+  local allSol = {}
+  
+  if opt.inference == 'map' then
+    if opt.solution == 'integer' then
+      Solfile = string.format('%sdata/%s/QBP_N%d_M%d.mat',getRootDir(), ttmode, opt.max_n, opt.max_m);
+      checkFileExist(Solfile,'solution file')
+      local loaded = mattorch.load(Solfile)
+      allSol = loaded.allSolInt:t() -- transpose because Matlab is first-dim-major
+    elseif opt.solution == 'distribution' then
+      Solfile = string.format('%sdata/%s/QBP_N%d_M%d.mat',getRootDir(), ttmode, opt.max_n, opt.max_m);
+      checkFileExist(Solfile,'solution file')
+      local loaded = mattorch.load(Solfile)
+      allSol = loaded.allSol:t() -- transpose because Matlab is first-dim-major
+    end
+  elseif opt.inference == 'marginal' then
+    Solfile = string.format('%sdata/%s/QBP_N%d_M%d.mat',getRootDir(), ttmode, opt.max_n, opt.max_m);
+    checkFileExist(Solfile,'solution file')
+    local loaded = mattorch.load(Solfile)
+    allSol = loaded.allMarginals:t() -- transpose because Matlab is first-dim-major
+--    print(allSol[1]:sub(1,7))
+    if mBst ~= nil then
+      local mBstField = string.format('all_%d_BestMarginals',mBst)
+      allSol = loaded[mBstField]:t() -- transpose because Matlab is first-dim-major
+--      print(allSol[1]:sub(1,7))
+--      abort()
+       -- transpose because Matlab is first-dim-major
+    end
+  end
+  
+  local totalDataSamples = allSol:size(1)
+  local trainSamplesNeeded = opt.synth_training*opt.mini_batch_size
+  local validSamplesNeeded = opt.synth_valid*opt.mini_batch_size
+  local totalSamplesNeeded = trainSamplesNeeded + validSamplesNeeded
+  local maxTrainingSample = math.min(trainSamplesNeeded,totalDataSamples-validSamplesNeeded)
+    
+  allSol=allSol:float()
+
+  pm('Loaded soln matrix of size '..allSol:size(1) .. ' x '..allSol:size(2))
+
+--  allQ = dataToGPU(allQ)
+--  allSol = dataToGPU(allSol)
+
+  local nth = 0 -- counter for reading lines
+  --  local solSize = opt.max_n*opt.max_m -- one hot
+  --  local opt.solSize = opt.max_n -- integer
+
+  -- training data
+  pm('training data...')
+  local nSamples = opt.synth_training
+  for n=1,nSamples do
+--    if n%math.floor(nSamples/2)==0 then print((n)*(100/(nSamples))..' %...') end
+
+    local oneBatchSol = torch.zeros(1,opt.solSize)
+
+    for mb=1,opt.mini_batch_size do
+      nth=nth+1
+      if nth>maxTrainingSample then nth=1 end
+      oneBatchSol = oneBatchSol:cat(allSol[nth]:reshape(1,opt.solSize),1)
+    end
+    oneBatchSol=oneBatchSol:sub(2,-1)
+    oneBatchSol = dataToGPU(oneBatchSol)
+    table.insert(SolTab, oneBatchSol)
+  end
+
+  pm('validation data...')
+  -- validation data
+  nth=maxTrainingSample
+  local nSamples = opt.synth_valid
+  for n=1,nSamples do
+--    if n%math.floor(nSamples/2)==0 then print((n)*(100/(nSamples))..' %...') end
+
+    local oneBatchSol = torch.zeros(1,opt.solSize)
+
+    for mb=1,opt.mini_batch_size do
+      nth=nth+1
+      oneBatchSol = oneBatchSol:cat(allSol[nth]:reshape(1,opt.solSize),1)
+    end
+    oneBatchSol=oneBatchSol:sub(2,-1)
+    oneBatchSol = dataToGPU(oneBatchSol)    
+    table.insert(ValSolTab, oneBatchSol)
+  end
+
+  opt.inSize = inSize
+  return SolTab, ValSolTab
+end
+
 
 function computeMarginals(CostTab)
   local SolTab = {}
@@ -480,6 +588,16 @@ function getData(opt, getTraining, getValidation)
   elseif opt.problem == 'quadratic' then
     if getTraining and getValidation then
       TrCostTab,TrSolTab,ValCostTab,ValSolTab = readQBPData('train')
+      -- mbest marginals
+      TrSolTab_m_BestMarginals, ValSolTab_m_BestMarginals = {}, {}
+      for m = 1,10 do
+        TrSolTab_m_BestMarginals[m], ValSolTab_m_BestMarginals = {}, {}
+        _, TrSolTab_m_BestMarginals[m], 
+        _, ValSolTab_m_BestMarginals[m] =  readQBPallMBstMarginals('train',m)
+      end
+--      print(#TrSolTab_m_BestMarginals)
+--      print(#ValSolTab_m_BestMarginals)
+--      abort()
     elseif getTraining then
       TrCostTab,TrSolTab = readQBPData('train')
     end
@@ -909,7 +1027,11 @@ function printDebugValues(C, Pred)
 --    print(torch.sum(s,1))
 
     local asssum = torch.sum(s,1)
-    local mmass, notass = torch.sum(asssum:gt(1)), torch.sum(asssum:eq(0))
+    local findMultiAss = asssum:gt(1)
+    local sumMultiAss = asssum[findMultiAss] - 1
+--    print(findMultiAss)
+--    print(sumMultiAss)
+    local mmass, notass = torch.sum(sumMultiAss), torch.sum(asssum:eq(0))
     print(string.format('%5s%5.1f%5.1f%5.1f%5d| Multi-assign: %d, not assigned: %d','Sim',solProb,torch.sum(torch.abs(diff)),predProb,MMsum,mmass,notass))
 
   end

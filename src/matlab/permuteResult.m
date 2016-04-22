@@ -1,4 +1,4 @@
-function [newK,newResult]=permuteResult(K, result)
+function [newK,newResult, newOrder]=permuteResult(K, result)
 %%
 
 fullN=sqrt(size(K,1)); fullM=fullN;
