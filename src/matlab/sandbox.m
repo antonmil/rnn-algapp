@@ -1,45 +1,17 @@
-function genQBP(N, mb, nTr, mBst)
 %% quadratic program data and solutions
-
-addpath(genpath('.')); 
-Pair_M = doMatching();
-
 % first set parameters
 % problem size
-% addpath('Matching');
-if nargin<1, N=5; end
-if nargin<2, mb = 10; end % minibatch size
-if nargin<3, nTr = 1000; end % training batches
-if nargin<4, mBst=0; end % training batches
-
-doMarginals = mBst>0;
-if doMarginals, fprintf('Compute %d-best marginals\n',mBst); end
-
-dataMB = N^4 * mb * nTr * 8 / 1024 / 1024;
-if dataMB>1000    
-    nTr = round(1000/dataMB * nTr);
-    fprintf('Too many samples needed. Out-of-memory danger. Reduced to %d\n',nTr)
-    dataMB = N^4 * mb * nTr * 8 / 1024 / 1024;
-end
-fprintf('Data alone will be %.1f MB\n',dataMB);
-
-
-
-% N=5;
+addpath('Matching');
+N=2;
 M=N;
 rng('shuffle')
-rng(1);
-
 
 Ns=N;
+mb = 10; % minibatch size
+nTr = 1000; % training batches
 maxSimThr = 0.8;
 sparseFactor = 0.8;
 
-newResEveryNTimes = factorial(N)/2;
-newResEveryNTimes = min(newResEveryNTimes, nTr);
-newResEveryNTimes = 1;
-
-fprintf('Gen unique problem every %d samples\n',newResEveryNTimes);
 
 ttmodes = {'train','test'};
 % ttmodes = {'train'};
@@ -71,29 +43,23 @@ for ttm=ttmodes
     data.allN = zeros(nSamples, 1); % number of non-zeros
     data.allSol = zeros(nSamples, N*M);
     data.allc = zeros(nSamples, N*M);
-    data.allMarginals = zeros(nSamples, N*M);
     data.allSolInt = zeros(nSamples, N);
     data.allSolTimes = zeros(nSamples, 1);
     data.optres=false(nSamples,1);
     
     n=0;
     while n<nSamples
-        if ~mod(n, newResEveryNTimes)
-            
-        
 %         n
 %     for n=1:nSamples
 
         
         % generate random prob
-%         pot = rand*2;
-%         Q = rand(N*M, N*M).^pot;
-%         if rand<.5
-%             Q = randn(N*M, N*M).^pot;
-%         end
-%         
-%         Q=real(Q);
-        Q = rand(N*M, N*M);
+        pot = rand*2;
+        Q = rand(N*M, N*M).^pot;
+        if rand<.5
+            Q = randn(N*M, N*M).^pot;
+        end
+        Q=real(Q);
         
         Q=(Q' * Q); % Positive semi-definite        
         
@@ -102,6 +68,17 @@ for ttm=ttmodes
         Q = Q / max(Q(:));          % <= 1
         %     Q = -Q;                     % negative semi-definite (because we are argmaxing)
            
+%         for ii=1:N*M, Q(ii,ii)=0; end % set diag=0
+        % only keep immediate neighbors
+%         for ii=1:N
+%             for jj=1:M
+%                 if abs(ii-jj)>1
+%                     Qsub = sub2ind([N,N],jj,ii);
+%                     Q(Qsub,:)=0;
+%                     Q(:,Qsub)=0;
+%                 end
+%             end
+%         end
 
         % sparsify according to real data
         RM = Pair_M{1,randi(length(Pair_M))};
@@ -146,52 +123,26 @@ for ttm=ttmodes
 %         if ~strcmpi(result.status,'optimal')
 %             continue;
 %         end
-
-% pause
-        
-        % Mbest marginals?
-        tocMar = 0;
-        if doMarginals
-            tic;
-            asgIpfpSMbst = mBestIPFP(Q,mBst);
-            tocMar = toc;
-        end
-
-
-        result.x = binarize(result.x);
-        if n<=1
-            runtime = tocMar + result.runtime;
-            timestr = datestr(runtime* nSamples/24/3600, 'HH:MM:SS.FFF');
-            fprintf('Estimated total time: %s. %.3f sec per solution.\n', ...
-                timestr, runtime);
-        end
-        else
-%             pause
-%             result.x' * Q * result.x
-            [Q, newRes] = permuteResult(Q, result.x);
-            result.x = newRes;
-            if doMarginals, asgIpfpSMbst = mBestIPFP(Q,mBst); end
-%             result.x' * Q * result.x
-%             pause
-        end
         n=n+1;
+%         result.status = 'TIME_LIMIT';
+%         result.x = zeros(N*M,1);result.x(1,1)=1;
+        result.x = binarize(result.x);
+        if n==1                        
+            timestr = datestr(result.runtime* nSamples/24/3600, 'HH:MM:SS.FFF');
+            fprintf('Estimated total time: %s. %.3f sec per solution.\n', ...
+                timestr, result.runtime);
+        end
         
         nnz = numel(find(Q(:)));
         torchSparse = sparseTensor(Q);        
-%         asgIpfpSMbst.marginals
-%         pause
-        
         
         % insert in joint matrices
         data.allQ(n,:) = Q(:)'; % WARNING. IS THIS CORRECT INDEXING FOR NON_SYMM MATRICES?        
         data.allnnz(n,1) = nnz;
         data.allSparseQ(n,1:nnz*2) = torchSparse(:)';
         data.allc(n,:) = c;
-        data.allSol(n,:) = result.x';
+        data.allSol(n,:) = result.x';        
         data.allSolTimes(n,1) = result.runtime;
-        if doMarginals
-            data.allMarginals(n,:) = reshape(asgIpfpSMbst.marginals', 1, N*M);
-        end
         [~,ass] = getOneHot(result.x);
         data.allSolInt(n,:) = ass;
         if strcmpi(result.status,'optimal')
@@ -205,8 +156,7 @@ for ttm=ttmodes
             
             % write results
             writeQBP(ttmode, N, M, 'QBP', data, n, dv);
-        end
-        
+        end        
     end
     
     fprintf('Optimal solutions found: %d / %d (= %.1f %%)\n',numel(find(data.optres)),nSamples,numel(find(data.optres))/nSamples*100);

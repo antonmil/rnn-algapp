@@ -212,7 +212,9 @@ end
 
 
 
-
+local cmdstr = string.format('sh genData.sh %d %d %d %d',opt.max_n, opt.mini_batch_size, opt.synth_training,1) 
+print(cmdstr)
+os.execute(cmdstr)
 getData(opt, true, true)
 
 
@@ -519,8 +521,12 @@ for i = 1, opt.max_epochs do
 
     -- check if we started overfitting
     -- first try generating new data
-    if ((i - minValidLossIt) > 3*opt.eval_val_every) and opt.random_epoch~=0 then
-      if opt.problem == 'quadratic' then os.execute("sh genData.sh") end
+    if ((i - minValidLossIt) > 2*opt.eval_val_every) and ((i - minValidLossIt) <= 6*opt.eval_val_every) and opt.random_epoch~=0 then
+      if opt.problem == 'quadratic' then
+        -- call matlab to generate new data
+        local cmdstr = string.format('sh genData.sh %d %d %d',opt.max_n, opt.mini_batch_size, opt.synth_training) 
+        os.execute(cmdstr) 
+      end
       getData(opt, true, false)
     end
       
@@ -595,12 +601,23 @@ for i = 1, opt.max_epochs do
 
 
     printModelOptions(opt, modelParams) -- print parameters
+
+    -- experiment with iterative GT refinement
+    local mBst = i/opt.eval_val_every
+    print('Now generate marginals with '..mBst..' mBst approximation')
+    local cmdstr = string.format('sh genData.sh %d %d %d %d',opt.max_n, opt.mini_batch_size, opt.synth_training,mBst) 
+    print(cmdstr)
+    os.execute(cmdstr)
+    getData(opt, true, true)
   end
 
   if (i == 1 or i % (opt.print_every*10) == 0) and i<opt.max_epochs then
     printModelOptions(opt, modelParams)
-    printTrainingHeadline()
+    printTrainingHeadline()       
   end -- headline
+
+
+  
 
 end
 

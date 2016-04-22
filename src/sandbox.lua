@@ -10,9 +10,15 @@ require 'util.misc'
 
 nngraph.setDebug(true)
 
-mlp = nn.DotProduct()
-x = torch.rand(5,1,4)
-y = torch.rand(5,4,1)
-print(x)
-print(y)
-print(mlp:forward({x, y}))
+inp=1;  -- dimensionality of one sequence element
+outp=1; -- number of derived features for one sequence element
+kw=3;   -- kernel only operates on one sequence element per step
+dw=1;   -- we step once and go on to the next sequence element
+
+mlp=nn.TemporalConvolution(inp,outp,kw,dw)
+print(mlp:getParameters():nElement())
+print(nn.Linear(7,24):getParameters():nElement())
+
+x=torch.rand(7,inp) -- a sequence of 7 elements
+print(mlp:forward(x):size())
+

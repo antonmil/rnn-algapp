@@ -1,10 +1,10 @@
           model_index  1
-             rnn_size  512
-           num_layers  4
+             rnn_size  64
+           num_layers  2
                 max_n  10
               problem  quadratic
-            inference  map
-             solution  integer
+            inference  marginal
+             solution  distribution
                sparse  0
          invert_input  0
          double_input  1
@@ -39,7 +39,7 @@
        reshuffle_dets  1
            order_dets  0
          use_gt_input  1
-         random_epoch  1
+         random_epoch  0
        freq_reshuffle  0
               permute  0
           dummy_noise  0

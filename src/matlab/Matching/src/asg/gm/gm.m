@@ -39,7 +39,7 @@ function asg = gm(K, Ct, asgT, parIni, parPosC, parPosD)
 %   modify   -  Seyed Hamid Rezatofighi(s.h.r.tofighi@gmail.com), 22-10-2015
 
 % function parameter
-prIn('gm', 'ini %s, posC %s, posD %s', parIni.alg, parPosC.alg, parPosD.alg);
+% prIn('gm', 'ini %s, posC %s, posD %s', parIni.alg, parPosC.alg, parPosD.alg);
 ha = tic;
 
 % initialization
@@ -50,6 +50,9 @@ XC = gmPosC(K, Ct, X0, parPosC);
 
 % continous -> discrete
 
+% make sure m <= N!
+parPosD.mbst = min(parPosD.mbst, factorial(size(Ct,1)));
+
 if strcmp(parPosD.alg,'ipfp_mbst')
     [Xm,objm,tme] = gmPosD_m(K, Ct, XC, parPosD);
     
@@ -58,6 +61,7 @@ if strcmp(parPosD.alg,'ipfp_mbst')
     xvs = xvs / sum(xvs);
     
     Probability = zeros(size(Xm,1),size(Xm,2));
+    
     for i=1:parPosD.mbst
         Probability = Probability+Xm(:,:,i).* xvs(i);
     end
@@ -77,6 +81,7 @@ if strcmp(parPosD.alg,'ipfp_mbst')
     asg.Xmbst = X;
     asg.X = Xm;
     asg.time=tme;
+    asg.marginals = Probability;
     
     prOut;
 else

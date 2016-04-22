@@ -1,4 +1,4 @@
 #!/bin/bash
 
 cd matlab
-matlab -nosplash -nodesktop -r "addpath(genpath('.')); cd Matching/; DemoCar_Anton; cd ..; genQBP; quit"
+matlab -nosplash -nodesktop -r "genQBP($1, $2, $3, $4); quit"

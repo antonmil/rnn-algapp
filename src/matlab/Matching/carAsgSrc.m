@@ -22,7 +22,7 @@ function wsSrc = carAsgSrc(pFs, nOus)
 % save option
 %prex = cellStr(tag, pFs, nIns);
 Fname = sprintf('%s_%d.mat', ...
-    './Cars_and_Motorbikes_Dataset_and_Code/Data_for_Cars_and_Motorbikes/Data_Pairs_Cars/pair', pFs);
+    './Matching/Cars_and_Motorbikes_Dataset_and_Code/Data_for_Cars_and_Motorbikes/Data_Pairs_Cars/pair', pFs);
 prex = sprintf('Motor_pair_%d', pFs);
 load(Fname);
 nIn = nF1;

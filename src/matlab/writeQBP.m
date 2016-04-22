@@ -6,6 +6,7 @@ function writeQBP(ttmode, N, M, fname, data,n,dv)
     allc = data.allc(1:n,:);
     allSol = data.allSol(1:n,:);
     allSolInt = data.allSolInt(1:n,:);
+    allMarginals = data.allMarginals(1:n,:);
     
     if nargin<7, dv = datevec(now); end
     
@@ -17,7 +18,7 @@ function writeQBP(ttmode, N, M, fname, data,n,dv)
     
     
 %     dlmwrite([filename,'.txt'],data);
-    save([filename,'.mat'],'allQ','allSparseQ','allnnz','allc','allSol','allSolInt','-v7.3');
+    save([filename,'.mat'],'allQ','allSparseQ','allnnz','allc','allSol','allSolInt','allMarginals','-v7.3');
     
 %     fprintf('\n');
 end

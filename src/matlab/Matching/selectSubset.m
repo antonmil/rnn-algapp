@@ -49,11 +49,14 @@ if saveSample
     result.x = binarize(result.x);
     allSol = result.x';
     [~, allSolInt]=getOneHot(allSol);
+    
+    asgIpfpSMbst = mBestIPFP(newK,5);
+    allMarginals = reshape(asgIpfpSMbst.marginals',1,N*M);
 %     [u,~]=find(reshape(result.x,N,M)');
 
 %     allSolInt = u'
 %     result.x(:)' * newK * result.x(:)
     
     allQ=full(newK);    
-    save(sprintf('%sdata/test_%d.mat',getRootDir,N),'allQ','allSol','allSolInt');
+    save(sprintf('%sdata/test_%d.mat',getRootDir,N),'allQ','allSol','allSolInt','allMarginals');
 end

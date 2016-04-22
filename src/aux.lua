@@ -32,7 +32,7 @@ function fixOpt(opt)
   opt.inSize2 = opt.nClasses  
   if opt.problem == 'quadratic' then opt.inSize2 = opt.max_n*opt.max_n*opt.max_m end
   
---  opt.inSize2 = opt.inSize
+  opt.inSize2 = opt.inSize
   
   opt.solSize = opt.max_n -- integer
   if opt.solution == 'distribution' then
@@ -286,18 +286,26 @@ function readQBPData(ttmode)
 
   local Solfile = string.format('%sdata/%s/QBP_N%d_M%d.mat',getRootDir(), ttmode, opt.max_n, opt.max_m);
   local allSol = {}
-  if opt.solution == 'integer' then
+  
+  if opt.inference == 'map' then
+    if opt.solution == 'integer' then
+      Solfile = string.format('%sdata/%s/QBP_N%d_M%d.mat',getRootDir(), ttmode, opt.max_n, opt.max_m);
+      checkFileExist(Solfile,'solution file')
+      local loaded = mattorch.load(Solfile)
+      allSol = loaded.allSolInt:t() -- transpose because Matlab is first-dim-major
+    elseif opt.solution == 'distribution' then
+      Solfile = string.format('%sdata/%s/QBP_N%d_M%d.mat',getRootDir(), ttmode, opt.max_n, opt.max_m);
+      checkFileExist(Solfile,'solution file')
+      local loaded = mattorch.load(Solfile)
+      allSol = loaded.allSol:t() -- transpose because Matlab is first-dim-major
+    end
+  elseif opt.inference == 'marginal' then
     Solfile = string.format('%sdata/%s/QBP_N%d_M%d.mat',getRootDir(), ttmode, opt.max_n, opt.max_m);
     checkFileExist(Solfile,'solution file')
     local loaded = mattorch.load(Solfile)
-    allSol = loaded.allSolInt:t() -- transpose because Matlab is first-dim-major
-  elseif opt.solution == 'distribution' then
-    Solfile = string.format('%sdata/%s/QBP_N%d_M%d.mat',getRootDir(), ttmode, opt.max_n, opt.max_m);
-    checkFileExist(Solfile,'solution file')
-    local loaded = mattorch.load(Solfile)
-    allSol = loaded.allSol:t() -- transpose because Matlab is first-dim-major
+    allSol = loaded.allMarginals:t() -- transpose because Matlab is first-dim-major
   end
-
+  
   allQ=allQ:float()
   allSol=allSol:float()
 
@@ -407,7 +415,9 @@ function computeMarginals(CostTab)
      
           
       local marginals = torch.zeros(N,M):double() -- double precision necessary here
+      local permCnt=0
       for key, var in pairs(solTable.feasSol) do
+        permCnt=permCnt+1
         local idx = var:eq(1)              -- find assignments
         local hypCost = 0
         if opt.problem=='linear' then 
@@ -422,10 +432,14 @@ function computeMarginals(CostTab)
 --          marginals[idx] = marginals[idx] + torch.exp(hypCost)   -- add to joint matrix
           marginals[idx] = marginals[idx] + hypCost   -- add to joint matrix
 --          print(torch.sum(marginals))
+--        print(permCnt)
+--        print(marginals)
+--        sleep(1)
+--        if permCnt>=4 then break end
+
       end
 --      abort()
       
---      print(marginals)
 --      print('---')
 --      print(C[1][1])
 --      print(marginals[1][1])
@@ -451,7 +465,7 @@ function computeMarginals(CostTab)
     table.insert(SolTab, dataToGPU(batchMarginals))
   end
   
-  if not onNetwork() then pm('Save marginals to disk') torch.save(marFile, SolTab) end
+  if not onNetwork() and TRAINING then pm('Save marginals to disk') torch.save(marFile, SolTab) end
   
   return SolTab
 end
@@ -471,11 +485,11 @@ function getData(opt, getTraining, getValidation)
     end
   end
   
-  if opt.inference == 'marginal' then
-    pm('Computing marginals...')  
-    if getTraining then TrSolTab = computeMarginals(TrCostTab) end
-    if getValidation then ValSolTab = computeMarginals(ValCostTab) end
-  end
+--  if opt.inference == 'marginal' then
+--    pm('Computing marginals...')  
+--    if getTraining then TrSolTab = computeMarginals(TrCostTab) end
+--    if getValidation then ValSolTab = computeMarginals(ValCostTab) end
+--  end
   
   if getTraining then TrCostTab = prepData(TrCostTab) end
   if getValidation then ValCostTab = prepData(ValCostTab) end
@@ -555,6 +569,10 @@ end
 
 
 function findFeasibleSolutions(N,M)
+  if N>9 or M>9 then
+    pm('Problem too large for exhaustive search')
+    return {}
+  end
   pm(string.format('Finding all feasible %d x %d assignments...',N,M))
   local feasSolFile = string.format('%stmp/feasSol_n%d_m%d.t7',getRootDir(), N, M)
   if exist(feasSolFile) then
@@ -775,6 +793,7 @@ function printDebugValues(C, Pred)
 
   -- sol is the solution matrix (binary or distribution)
   local sol = huns:sub(1,1)
+--  print(sol)
   if opt.solution=='integer' then sol=getOneHotLab(sol, true)
   else
 --    print(sol) 
@@ -886,8 +905,12 @@ function printDebugValues(C, Pred)
     local solProb = evalSol(maxSol,nil,C)
     local predProb = evalSol(maxMargins, nil, C)
     local MMsum = torch.sum((smaxi-pmaxi):ne(0)) -- sum of wrong predictions
+--    print(s)
+--    print(torch.sum(s,1))
 
-    print(string.format('%5s%5.1f%5.1f%5.1f%5d|','Sim',solProb,torch.sum(torch.abs(diff)),predProb,MMsum))
+    local asssum = torch.sum(s,1)
+    local mmass, notass = torch.sum(asssum:gt(1)), torch.sum(asssum:eq(0))
+    print(string.format('%5s%5.1f%5.1f%5.1f%5d| Multi-assign: %d, not assigned: %d','Sim',solProb,torch.sum(torch.abs(diff)),predProb,MMsum,mmass,notass))
 
   end
 
