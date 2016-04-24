@@ -1594,7 +1594,6 @@ function getOneHotLab(lab, singleBatch, nClasses)
     for mb=1,opt.mini_batch_size do 
       local mbStartT = opt.max_n * (mb-1)+1
       local mbEndT =   opt.max_n * mb
-      
       local ind = lab[{{mbStartT, mbEndT}}]:long():reshape(opt.max_n)
       local labOne = eye:index(1,ind)
       
@@ -1611,8 +1610,29 @@ end
 --- TODO docs
 -- @param lab			label (data association) vector for one frame
 -- @param singleBatch	single- or mult-batch switch
-function getOneHotLab2(lab, singleBatch)
+function getOneHotLab2(lab, batchMode, nClasses)
+  if batchMode == nil then batchMode = false end
+  
+  nClasses = nClasses or opt.nClasses
+  
+  local eye = dataToGPU(torch.eye(nClasses))
 
+  local labs = dataToGPU(torch.zeros(1,nClasses))     
+  if batchMode then
+    labs = dataToGPU(torch.zeros(opt.mini_batch_size, opt.max_n, nClasses))
+    for mb=1,opt.mini_batch_size do
+      local ind = lab[mb]:long():reshape(opt.max_n)
+      local labOne = eye:index(1,ind)
+      labs[mb] = labOne
+    end
+--    labs = labs:sub(2,-1)
+--    print(labs)
+--    abort()              
+  else 
+    local ind = lab:long():reshape(opt.max_n)
+    labs = eye:index(1,ind)
+  end
+  return labs
 end
 
 function getOneHotLabAll(lab, singleBatch)

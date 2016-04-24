@@ -29,10 +29,13 @@ function fixOpt(opt)
     opt.inSize = opt.max_n*opt.max_m * opt.max_n*opt.max_m -- QBP
   end
 --  opt.splitInput = 1
-  opt.inSize2 = opt.nClasses  
-  if opt.problem == 'quadratic' then opt.inSize2 = opt.max_n*opt.max_n*opt.max_m end
-  
   opt.inSize2 = opt.inSize
+  
+  -- partial input (row-by-row...)
+  if opt.full_input == 1 then
+    opt.inSize2 = opt.nClasses  
+    if opt.problem == 'quadratic' then opt.inSize2 = opt.max_n*opt.max_n*opt.max_m end
+  end
   
   opt.solSize = opt.max_n -- integer
   if opt.solution == 'distribution' then
@@ -48,8 +51,8 @@ function fixOpt(opt)
   if opt.double_input ~= 0 then  
     opt.inSize = opt.inSize*2
     opt.inSize2 = opt.inSize2*2
-    opt.featmat_n = opt.featmat_n*2
-    opt.featmat_m = opt.featmat_m*2
+--    opt.featmat_n = opt.featmat_n*2
+--    opt.featmat_m = opt.featmat_m*2
   end
   
   -- setting as integers
@@ -1065,6 +1068,29 @@ function evalSol(sol, c, Q)
 
   local ret = c * sol + sol:t() * Q * sol
   return ret:squeeze()
+end
+
+function evalBatchConstraints(sol)
+  local c1 = torch.sum(sol,2) -- vertical sum
+  local c1cost = torch.sum(c1:ne(1), 3)
+  c1cost = c1cost:reshape(opt.mini_batch_size, 1)
+  
+  -- this one is superfluous
+--  local c2 = torch.sum(sol,3) -- horizontal sum
+--  local c2cost = torch.sum(c2:ne(1) * opt.mu, 2)
+  
+--  print(c1)
+--  print(c1cost)
+--  print(c2)
+--  print(c2cost)
+--  abort()
+  return c1cost
+end
+
+function evalBatchQP(sol, Q)
+  local obj = torch.bmm(Q,sol)
+  obj = torch.bmm(sol:transpose(2,3), obj)
+  return obj
 end
 
 function plotProgress(predictions,winID, winTitle)

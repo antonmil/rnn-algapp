@@ -50,7 +50,7 @@ if saveSample
     allSol = result.x';
     [~, allSolInt]=getOneHot(allSol);
     
-    asgIpfpSMbst = mBestIPFP(newK,5);
+    asgIpfpSMbst = mBestIPFP(newK,10);
     allMarginals = reshape(asgIpfpSMbst.marginals',1,N*M);
 %     [u,~]=find(reshape(result.x,N,M)');
 

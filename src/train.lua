@@ -49,6 +49,7 @@ cmd:option('-solution','integer','[integer|distribution]')
 cmd:option('-sparse',0,'are the features passed as a sparse matrix?')
 cmd:option('-invert_input',0,'Invert input? (Sutskever et al., 2014)')
 cmd:option('-double_input',0,'Double input? (Zaremba and Sutskever, 2014)')
+cmd:option('-full_input',1,'Input full cost matrix (1), or row-by-row (0)')
 cmd:option('-supervised',1,'Supervised or unsupervised learning')
 -- optimization
 cmd:option('-lrng_rate',1e-2,'learning rate')
@@ -267,6 +268,7 @@ function eval_val()
   local T = opt.max_n
   local plotSeq = math.random(tL)
   plotSeq=1
+  local eval_predMeanEnergy = 0
   for seq=1,tL do
     costs = ValCostTab[seq]:clone()
     huns = ValSolTab[seq]:clone()
@@ -300,7 +302,21 @@ function eval_val()
       local tloss = clones.criterion[t]:forward(input, output)
 
       loss = loss + tloss
+      
+
     end
+    local predDA = decode(predictions)
+    local mv, mi = torch.max(predDA,3)
+    local sol = getOneHotLab2(mi, true, opt.max_n)
+    local predConstr = evalBatchConstraints(sol)
+    sol = sol:reshape(opt.mini_batch_size, opt.max_n*opt.nClasses, 1) -- make batches of column vectors
+    local cmtr = costs:reshape(opt.mini_batch_size, opt.featmat_n, opt.featmat_m)
+    local predObj = evalBatchQP(sol, cmtr)
+
+    local predEnergy = predObj - predConstr * opt.mu
+--    print((5-torch.mean(predEnergy,1):squeeze()))
+    eval_predMeanEnergy = eval_predMeanEnergy + (5-torch.mean(predEnergy,1):squeeze())
+            
 
 
     if seq==plotSeq then
@@ -312,8 +328,9 @@ function eval_val()
     eval_val_multass = 0
   end
   loss = loss / T / tL  -- make average over all frames
+  eval_predMeanEnergy = eval_predMeanEnergy / tL
 
-  return loss
+  return loss, eval_predMeanEnergy
 end
 
 
@@ -350,30 +367,47 @@ function feval()
     rnninp, rnn_state = getRNNInput(t, rnn_state, predictions)    -- get combined RNN input table
     local lst = clones.rnn[t]:forward(rnninp) -- do one forward tick
     predictions[t] = lst
-    --         print(lst)
-    --         abort()
-
-    --    print(rnninp[1])
+    
     rnn_state[t] = {}
     for i=1,#init_state do table.insert(rnn_state[t], lst[i]) end -- extract the state, without output
     DA[t] = decode(predictions, t)
-    --         print(DA[t])
-    --         abort()
     local input, output = getPredAndGTTables(DA[t], t)
---        print(input[1])
---        print(output[1])
-    --    abort()
 
     local tloss = clones.criterion[t]:forward(input, output)
     loss = loss + tloss
-    --    print(tloss)
-    --    abort()
   end
   loss = loss / T -- make average over all frames
   local predDA = decode(predictions)
   --   if opt.mini_batch_size>1 then predDA=predDA:sub(1,opt.max_n) end
+  local mv, mi = torch.max(predDA,3)
+--  print(mi)
 
+  -- get prediction energy
+  local sol = getOneHotLab2(mi, true, opt.max_n)
+  local predConstr = evalBatchConstraints(sol)
+  sol = sol:reshape(opt.mini_batch_size, opt.max_n*opt.nClasses, 1) -- make batches of column vectors
+  local cmtr = costs:reshape(opt.mini_batch_size, opt.featmat_n, opt.featmat_m)
+  local predObj = evalBatchQP(sol, cmtr)
 
+  -- get ground truth energy  
+  local GTConstr = evalBatchConstraints(huns:reshape(opt.mini_batch_size, opt.max_n, opt.max_m))
+  local solGT = huns:reshape(opt.mini_batch_size, opt.max_n*opt.nClasses, 1) -- make batches of column vectors
+  local GTObj = evalBatchQP(solGT, cmtr)  
+  
+  local predEnergy = predObj - predConstr * opt.mu
+  local GTEnergy = GTObj - GTConstr * opt.mu
+--  print(predEnergy)
+  predMeanEnergy = 5-torch.mean(predEnergy,1):squeeze()
+--  abort()
+--  print(GTEnergy)
+  local energies = predEnergy:cat(GTEnergy, 3)
+--  print(energies)
+  
+  local solv, takeSol = torch.max(energies, 3)
+  takeSol=takeSol:reshape(opt.mini_batch_size, 1):eq(1) -- keep prediction?
+  huns[takeSol:expand(opt.mini_batch_size, opt.max_n*opt.nClasses)] = sol:clone()
+--  print(takeSol)
+  
   -- plotting
   -- plotting
   if (globiter == 1) or (globiter % opt.plot_every == 0) then
@@ -426,7 +460,8 @@ end
 
 
 
-
+train_energies = {}
+val_energies = {}
 train_losses = {}
 val_losses = {}
 real_losses = {}
@@ -459,6 +494,8 @@ for i = 1, opt.max_epochs do
 
   local train_loss = loss[1] -- the loss is inside a list, pop it
   train_losses[i] = train_loss
+  train_energies[i] = predMeanEnergy
+  
 
   -- exponential learning rate decay
   if i % (torch.round(opt.max_epochs/10)) == 0 and opt.lrng_rate_decay < 1 then
@@ -489,8 +526,10 @@ for i = 1, opt.max_epochs do
     plot_real_loss_x, plot_real_loss = getValLossPlot(real_losses)
 
     -- evaluate validation set
-    val_loss = eval_val()
+    val_loss, val_energy = eval_val()
     val_losses[i] = math.max(val_loss, 1e-5)
+    val_energies[i] = val_energy
+    
 
     train_mm[i] = feval_mm+1
     val_mm[i] = eval_val_mm+1
@@ -508,7 +547,9 @@ for i = 1, opt.max_epochs do
 
     local plot_train_ma_x, plot_train_ma = getValLossPlot(train_ma)
     local plot_val_ma_x, plot_val_ma = getValLossPlot(val_ma)
-
+    
+    local _, plot_energies = getLossPlot(i, opt.eval_val_every, train_energies)  
+    local _, plot_val_energies = getValLossPlot(val_energies)
 
     --       print(train_losses)
     --       print(plot_loss)
@@ -522,12 +563,33 @@ for i = 1, opt.max_epochs do
     minRealLoss=minRealLoss:squeeze()
     minRealLossIt=minRealLossIt:squeeze()*opt.eval_val_every
 
+    local minTrainEnergy, minTrainEnergyIt = torch.min(plot_energies,1)
+    local minValidEnergy, minValidEnergyIt = torch.min(plot_val_energies,1)
+    minTrainEnergy=minTrainEnergy:squeeze()
+    minTrainEnergyIt=minTrainEnergyIt:squeeze()*opt.eval_val_every
+    minValidEnergy=minValidEnergy:squeeze()
+    minValidEnergyIt=minValidEnergyIt:squeeze()*opt.eval_val_every
+
+
+    pm('--------------------------------------------------------')
+    pm(string.format('%10s%10s%10s','Energies','Training','Valid'))
+    pm(string.format('%10s%10.2f%10.2f','Current',plot_energies[-1],val_energy))
+    pm(string.format('%10s%10.2f%10.2f','Best',minTrainEnergy,  minValidEnergy))
+    pm(string.format('%10s%10d%10d','Iter',minTrainEnergyIt,  minValidEnergyIt))
     pm('--------------------------------------------------------')
     pm(string.format('%10s%10s%10s%10s','Losses','Training','Valid','Real'))
     pm(string.format('%10s%10.5f%10.5f%10.5f','Current',plot_loss[-1],val_loss,real_loss))
     pm(string.format('%10s%10.5f%10.5f%10.5f','Best',minTrainLoss,  minValidLoss, minRealLoss))
     pm(string.format('%10s%10d%10d%10d','Iter',minTrainLossIt,  minValidLossIt, minRealLossIt))
 
+    -- save lowest val energy if necessary
+    if minValidEnergyIt == i then
+      pm('*** New min. validation energy found! ***',2)
+      local fn, dir, base, signature, ext = getCheckptFilename(modelName, opt, modelParams)
+      local savefile  = dir .. base .. '_' .. signature .. '_valen' .. ext
+      saveCheckpoint(savefile, tracks, detections, protos, opt, train_losses, glTimer:time().real, i)
+    end
+    
 
     -- check if we started overfitting
     -- first try generating new data
@@ -582,7 +644,7 @@ for i = 1, opt.max_epochs do
 
     --       os.execute("th rnnTrackerY.lua -model_name testingY -model_sign r50_l2_n3_m3_d2_b1_v0_li1 -suppress_x 0 -length 5 -seq_name TUD-Crossing")
     -- save lowest val if necessary
-    if val_loss <= torch.min(plot_val_loss) then
+    if minValidLossIt == i then
       pm('*** New min. validation loss found! ***',2)
       local fn, dir, base, signature, ext = getCheckptFilename(modelName, opt, modelParams)
       local savefile  = dir .. base .. '_' .. signature .. '_val' .. ext
@@ -604,7 +666,11 @@ for i = 1, opt.max_epochs do
     --       table.insert(lossPlotTab, {"Trng MA",plot_train_ma_x, plot_train_ma, 'points pt 1'})
     --       table.insert(lossPlotTab, {"Vald MA",plot_val_ma_x, plot_val_ma, 'points pt 3'})
 
-
+--    print(plot_energies)
+    table.insert(lossPlotTab, {"Trng E",plot_loss_x,plot_energies/opt.mu, 'with linespoints lt 4'})
+--    print(plot_val_loss_x, plot_val_energies)
+    table.insert(lossPlotTab, {"Vald E",plot_val_loss_x, plot_val_energies/opt.mu, 'with linespoints lt 5'})
+    
     --  local minInd = math.min(1,plot_loss:nElement())
     local maxY = math.max(torch.max(plot_loss), torch.max(plot_val_loss), torch.max(plot_real_loss),
       torch.max(plot_train_mm), torch.max(plot_val_mm), torch.max(plot_real_mm))*2

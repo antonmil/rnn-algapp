@@ -7,13 +7,16 @@ Pair_M = doMatching();
 % first set parameters
 % problem size
 % addpath('Matching');
-if nargin<1, N=5; end
+if nargin<1, N=3; end
 if nargin<2, mb = 10; end % minibatch size
 if nargin<3, nTr = 10; end % training batches
 if nargin<4, mBst=5; end % training batches
 
 doMarginals = mBst>0;
 if doMarginals, fprintf('Compute %d-best marginals\n',mBst); end
+takeRealData = true;
+
+if takeRealData, fprintf('Taking real cost\n'); end
 
 dataMB = N^4 * mb * nTr * 8 / 1024 / 1024;
 if dataMB>1000
@@ -83,70 +86,63 @@ for ttm=ttmodes
     n=0;
     while n<nSamples
         if ~mod(n, newResEveryNTimes)
-            
-            
-            %         n
-            %     for n=1:nSamples
-            
-            
-            % generate random prob
-            %         pot = rand*2;
-            %         Q = rand(N*M, N*M).^pot;
-            %         if rand<.5
-            %             Q = randn(N*M, N*M).^pot;
-            %         end
-            %
-            %         Q=real(Q);
-            Q = rand(N*M, N*M);
-            
-            Q=(Q' * Q); % Positive semi-definite
-            
-            Q = Q - min(Q(:));    % >= 0
-            %         Q(Q>maxSimThr)=maxSimThr;           % max
-            Q = Q / max(Q(:));          % <= 1
-            %     Q = -Q;                     % negative semi-definite (because we are argmaxing)
-            
-            
+           
             % sparsify according to real data
             RM = Pair_M{1,randi(length(Pair_M))};
             newK = selectSubset(RM,Ns); %spy(newK);
-            Q(~newK)=0;
-            %         Q(1:Ns*Ns,1:Ns*Ns) = Q(1:Ns*Ns,1:Ns*Ns).*(~~newK);
-            
-            
-            
-            % set diag to rand
-            Q(1:N*N+1:end) = rand(1,N*N);
-            
-            % sparsify more
-            rmNPts = randi(N)-1;
-            if rmNPts>0
-                rmPts = randperm(N); rmPts=rmPts(1:rmNPts);
-                rmEntries = zeros(1,length(rmPts)^2);
-                nn=0;
-                for i=rmPts,
-                    for j=rmPts,
-                        ii=sub2ind([N,M],i,j);
-                        nn=nn+1;
-                        rmEntries(nn)=ii;
-                        Q(ii,:)=0;
-                        Q(:,ii)=0;
-                    end
-                end
-            end
-            %         rmPts
-            %         rmEntries
-            %         pause
-            
-            Q = Q / max(Q(:));          % <= 1
+
             
             c = ones(1,N*M);            % linear weights
+            
+            if takeRealData
+                Q = newK; % TAKE REAL DATA!
+            else
+                Q = rand(N*M, N*M);
+                Q=(Q' * Q); % Positive semi-definite
+                Q = Q - min(Q(:));    % >= 0
+                Q = Q / max(Q(:));          % <= 1
+                Q(~newK)=0;
+
+                % set diag to rand
+                Q(1:N*N+1:end) = rand(1,N*N);
+
+                % sparsify more
+    %             rmNPts = randi(N)-1;
+    %             if rmNPts>0
+    %                 rmPts = randperm(N); rmPts=rmPts(1:rmNPts);
+    %                 rmEntries = zeros(1,length(rmPts)^2);
+    %                 nn=0;
+    %                 for i=rmPts,
+    %                     for j=rmPts,
+    %                         ii=sub2ind([N,M],i,j);
+    %                         nn=nn+1;
+    %                         rmEntries(nn)=ii;
+    %                         Q(ii,:)=0;
+    %                         Q(:,ii)=0;
+    %                     end
+    %                 end
+    %             end
+
+
+                Q = Q / max(Q(:));          % <= 1
+            
+            end
+%             pause
             
             model.Q = sparse(Q); c(:)=1; % quadratic weights (c=const means no unaries)
             model.obj = c;
             
             if ~isempty(find(isnan(model.Q), 1)), continue; end
-            result = gurobi(model, params); % run gurobi
+            if takeRealData
+                result.status = 'optimal';
+                result.runtime = 0;
+                result.x = reshape(eye(N),1,N*N);
+            else
+                result = gurobi(model, params); % run gurobi
+            end
+%             [~, gurAss] = getOneHot(result.x);
+%             gurAss
+%             pause
             %         if ~strcmpi(result.status,'optimal')
             %             continue;
             %         end
