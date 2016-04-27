@@ -74,5 +74,5 @@ lrng_rate_decay_after  -1
            decay_rate  0.97
                  seed  1
                opencl  0
-                gpuid  -1
+                gpuid  0
                 

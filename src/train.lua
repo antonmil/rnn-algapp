@@ -174,6 +174,10 @@ if not onNetwork() then
 end
 -------------------------
 
+local _,_,_,modelSign = getCheckptFilename(modelName, opt, modelParams)
+local outDir = string.format('%stmp/%s_%s',getRootDir(),modelName, modelSign)
+mkdirP(outDir)
+
 -- the initial state of the cell/hidden states
 init_state = getInitState(opt, opt.mini_batch_size)
 
@@ -708,6 +712,11 @@ for i = 1, opt.max_epochs do
       local fn, dir, base, signature, ext = getCheckptFilename(modelName, opt, modelParams)
       local savefile  = dir .. base .. '_' .. signature .. '_valen' .. ext
       saveCheckpoint(savefile, tracks, detections, protos, opt, train_losses, glTimer:time().real, i)
+      
+      -- save energy as txt
+      csvWrite(string.format('%s/en_%.1f.txt',outDir,minValidEnergy),torch.Tensor(1,1):fill(minValidEnergy))  -- write cost matrix
+      csvWrite(string.format('%s/be.txt',outDir,minValidEnergy),torch.Tensor(1,1):fill(minValidEnergy)) -- write cost matrix
+          
     end
     
 
