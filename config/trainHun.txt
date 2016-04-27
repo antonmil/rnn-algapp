@@ -1,7 +1,7 @@
           model_index  1
-             rnn_size  128
-           num_layers  4
-                max_n  10
+             rnn_size  32
+           num_layers  1
+                max_n  3
               problem  quadratic
             inference  marginal
              solution  distribution
@@ -10,21 +10,24 @@
          double_input  1
            full_input  0
              exp_cost  1
-           supervised  1           
+           supervised  1
+         grad_replace  1
+    diverse_solutions  0
+        project_valid  0
             state_dim  4
            batch_size  1
             loss_type  1
                   vel  0
               fixed_n  1
                lambda  1
-                   mu  100
+                   mu  10
                
             init_from  
         training_file  
-           max_epochs  200000
+           max_epochs  50000
       mini_batch_size  10
        synth_training  1000
-          synth_valid  10
+          synth_valid  1
              full_set  0
 
         pert_training  0
@@ -64,12 +67,12 @@
           trim_tracks  0
             grad_clip  1
             lrng_rate  .001
-      lrng_rate_decay  0.95
+      lrng_rate_decay  0.8
 lrng_rate_decay_after  -1
          rand_par_rng  .08
           forget_bias  1
            decay_rate  0.97
                  seed  1
                opencl  0
-                gpuid  0
+                gpuid  -1
                 

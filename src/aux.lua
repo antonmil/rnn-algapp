@@ -432,14 +432,19 @@ function readQBPallMBstMarginals(ttmode, mBst)
     Solfile = string.format('%sdata/%s/QBP_N%d_M%d.mat',getRootDir(), ttmode, opt.max_n, opt.max_m);
     checkFileExist(Solfile,'solution file')
     local loaded = mattorch.load(Solfile)
-    allSol = loaded.allMarginals:t() -- transpose because Matlab is first-dim-major
+--    allSol = loaded.allMarginals:t() -- transpose because Matlab is first-dim-major
+    allSol = nil
 --    print(allSol[1]:sub(1,7))
     if mBst ~= nil then
       local mBstField = string.format('all_%d_BestMarginals',mBst)
       allSol = loaded[mBstField]:t() -- transpose because Matlab is first-dim-major
+--      print(mBst)
+--      print(allSol[1])
+--      abort()
 --      print(allSol[1]:sub(1,7))
 --      abort()
        -- transpose because Matlab is first-dim-major
+    else error('ha?')
     end
   end
   
@@ -461,7 +466,7 @@ function readQBPallMBstMarginals(ttmode, mBst)
   --  local opt.solSize = opt.max_n -- integer
 
   -- training data
-  pm('training data...')
+--  pm('training data...')
   local nSamples = opt.synth_training
   for n=1,nSamples do
 --    if n%math.floor(nSamples/2)==0 then print((n)*(100/(nSamples))..' %...') end
@@ -478,7 +483,7 @@ function readQBPallMBstMarginals(ttmode, mBst)
     table.insert(SolTab, oneBatchSol)
   end
 
-  pm('validation data...')
+--  pm('validation data...')
   -- validation data
   nth=maxTrainingSample
   local nSamples = opt.synth_valid
@@ -497,6 +502,8 @@ function readQBPallMBstMarginals(ttmode, mBst)
   end
 
   opt.inSize = inSize
+--  print(SolTab[1])
+--  abort()
   return SolTab, ValSolTab
 end
 
@@ -594,9 +601,11 @@ function getData(opt, getTraining, getValidation)
       -- mbest marginals
       TrSolTab_m_BestMarginals, ValSolTab_m_BestMarginals = {}, {}
       for m = 1,10 do
-        TrSolTab_m_BestMarginals[m], ValSolTab_m_BestMarginals = {}, {}
-        _, TrSolTab_m_BestMarginals[m], 
-        _, ValSolTab_m_BestMarginals[m] =  readQBPallMBstMarginals('train',m)
+        TrSolTab_m_BestMarginals[m], ValSolTab_m_BestMarginals[m] = {}, {}
+        TrSolTab_m_BestMarginals[m], ValSolTab_m_BestMarginals[m] =  readQBPallMBstMarginals('train',m)
+--        print(m)
+--        print(TrSolTab_m_BestMarginals[m][1])
+--        abort()
       end
 --      print(#TrSolTab_m_BestMarginals)
 --      print(#ValSolTab_m_BestMarginals)
@@ -606,14 +615,23 @@ function getData(opt, getTraining, getValidation)
     end
   end
   
---  if opt.inference == 'marginal' then
---    pm('Computing marginals...')  
---    if getTraining then TrSolTab = computeMarginals(TrCostTab) end
---    if getValidation then ValSolTab = computeMarginals(ValCostTab) end
---  end
+  if opt.inference == 'marginal' and opt.problem=='linear' then
+    pm('Computing marginals...')  
+    if getTraining then TrSolTab = computeMarginals(TrCostTab) end
+    if getValidation then ValSolTab = computeMarginals(ValCostTab) end
+  end
   
   if getTraining then TrCostTab = prepData(TrCostTab) end
   if getValidation then ValCostTab = prepData(ValCostTab) end
+  
+--  print(TrSolTab[1])
+  if opt.project_valid ~= 0 then
+    TrSolTab = projectValid(TrSolTab)
+    ValSolTab = projectValid(ValSolTab)
+  end
+--  print(TrSolTab[1])
+--  abort()
+    
 end
 
 function normalizeCost(CostTab)
@@ -650,9 +668,25 @@ function insertTokens(tab)
   return TrCostTabT
 end
 
+
+function projectValid(tab)
+  for k,v in pairs(tab) do
+    local projSol = v:clone()  
+    for m=1,opt.mini_batch_size do
+      local ass = hungarianL(-v[m]:reshape(opt.max_n, opt.max_m)):narrow(2,2,1):t() -- negative for maximising similarity
+      projSol[m] = getOneHotLab(ass,true,opt.max_n)
+    end
+    tab[k] = projSol:clone()    
+  end
+  return tab
+end
+
+
 function prepData(tab)
   pm('normalizing...')
   tab = normalizeCost(tab)
+  
+
 
 --  if opt.double_input ~= 0 then
 --    for k,v in pairs(tab) do tab[k] = v:cat(v,2) end    
@@ -867,7 +901,7 @@ function decode(predictions, tar)
       sol = lst[opt.solPredIndex]:reshape(opt.mini_batch_size, opt.solSize) 
       c1 = lst[opt.c1PredIndex]:reshape(opt.mini_batch_size, opt.c1Size)
       c2 = lst[opt.c2PredIndex]:reshape(opt.mini_batch_size, opt.c2Size)
-    end
+    end    
   else
     DA = zeroTensor3(opt.mini_batch_size,T,stepSolSize)
     if supervised == 0 then
@@ -884,6 +918,17 @@ function decode(predictions, tar)
         c2[{{},{tt},{}}] = lst[opt.c2PredIndex]:reshape(opt.mini_batch_size, 1, opt.c2Size)
       end
     end
+--    print(DA)
+    if opt.project_valid ~= 0 then
+      local projSol = DA:clone()
+      for m=1,opt.mini_batch_size do
+        local ass = hungarianL(-DA[m]):narrow(2,2,1):t()
+        projSol[m] = getOneHotLab(ass,true,opt.max_n)
+      end
+      DA = projSol:clone()
+    end
+--    print(DA)
+--    abort()
   end
   return DA, sol, c1, c2
 end
@@ -1032,8 +1077,6 @@ function printDebugValues(C, Pred)
     local asssum = torch.sum(s,1)
     local findMultiAss = asssum:gt(1)
     local sumMultiAss = asssum[findMultiAss] - 1
---    print(findMultiAss)
---    print(sumMultiAss)
     local mmass, notass = torch.sum(sumMultiAss), torch.sum(asssum:eq(0))
     print(string.format('%5s%5.1f%5.1f%5.1f%5d| Multi-assign: %d, not assigned: %d','Sim',solProb,torch.sum(torch.abs(diff)),predProb,MMsum,mmass,notass))
 
@@ -1072,7 +1115,8 @@ end
 
 function evalBatchConstraints(sol)
   local c1 = torch.sum(sol,2) -- vertical sum
-  local c1cost = torch.sum(c1:ne(1), 3)
+  local c1cost = torch.sum(c1:ne(1), 3)  
+  if c1cost:type()=='torch.ByteTensor' then c1cost = dataToGPU(c1cost) end
   c1cost = c1cost:reshape(opt.mini_batch_size, 1)
   
   -- this one is superfluous
@@ -1087,9 +1131,16 @@ function evalBatchConstraints(sol)
   return c1cost
 end
 
-function evalBatchQP(sol, Q)
-  local obj = torch.bmm(Q,sol)
-  obj = torch.bmm(sol:transpose(2,3), obj)
+function evalBatchEnergy(sol, Q)
+  local obj = 1
+--  print(Q)
+--  print(sol)
+  if opt.problem == 'linear' then
+    obj = torch.bmm(Q,sol)
+  elseif opt.problem == 'quadratic' then
+    obj = torch.bmm(Q,sol)
+    obj = torch.bmm(sol:transpose(2,3), obj)    
+  end
   return obj
 end
 
@@ -1100,8 +1151,8 @@ function plotProgress(predictions,winID, winTitle)
   if opt.supervised == 0 then 
     predDA = predictions[1][opt.daPredIndex+1]:reshape(opt.mini_batch_size*opt.max_n,opt.nClasses):sub(1,opt.max_n)
   else
-    local logpredDA = decode(predictions):reshape(opt.mini_batch_size*opt.max_n,opt.nClasses):sub(1,opt.max_n)  
-    predDA=costToProb(-logpredDA)    
+    predDA = decode(predictions):reshape(opt.mini_batch_size*opt.max_n,opt.nClasses):sub(1,opt.max_n)
+    if opt.project_valid == 0 then predDA=costToProb(-predDA) end
   end
   local predAsTracks = predDA:reshape(opt.max_n, opt.max_m, 1)
   
@@ -1217,3 +1268,10 @@ function plotProgressD(predictions,winID, winTitle)
   return mm
 end
 
+
+function minValAndIt(values)
+  local mv, mi = torch.min(values,1)
+  mv=mv:squeeze()
+  mi=mi:squeeze()*opt.eval_val_every
+  return mv, mi
+end

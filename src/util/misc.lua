@@ -2346,3 +2346,15 @@ function getSha(tab)
   return shastr
     
 end
+
+function minMax(...)
+  local min, max = 1e10, -1e10
+  local arg = {...}
+--  print(arg)
+  for i,v in ipairs(arg) do
+--    print(v)
+    if torch.min(v)<min then min = torch.min(v) end
+    if torch.max(v)>max then max = torch.max(v) end
+  end
+  return min, max
+end

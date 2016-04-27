@@ -80,7 +80,7 @@ end
 if par.chck_sols
     Xres=Ain(sizA1+1:sizA1+mbst,:);
     if (size(unique(Xres,'rows'),1)~=size(Xres,1))
-        warning('not unique results')
+%         warning('not unique results')
     end
 end
 

@@ -51,6 +51,8 @@ cmd:option('-invert_input',0,'Invert input? (Sutskever et al., 2014)')
 cmd:option('-double_input',0,'Double input? (Zaremba and Sutskever, 2014)')
 cmd:option('-full_input',1,'Input full cost matrix (1), or row-by-row (0)')
 cmd:option('-supervised',1,'Supervised or unsupervised learning')
+cmd:option('-grad_replace',1,'Replace better predictions with 0 gradient')
+cmd:option('-diverse_solutions',1,'take an improved m-bst solution iteratively')
 -- optimization
 cmd:option('-lrng_rate',1e-2,'learning rate')
 cmd:option('-lrng_rate_decay',0.99,'learning rate decay')
@@ -101,7 +103,7 @@ createAuxDirs()
 -- augment and fix opt --
 opt.supervised=1
 opt = fixOpt(opt)
-
+energyOffset = 10
 --opt.outSize = opt.nClasses
 
 -- number of hidden inputs (1 for RNN, 2 for LSTM)
@@ -269,6 +271,7 @@ function eval_val()
   local plotSeq = math.random(tL)
   plotSeq=1
   local eval_predMeanEnergy = 0
+  local eval_predMeanEnergyProj = 0
   for seq=1,tL do
     costs = ValCostTab[seq]:clone()
     huns = ValSolTab[seq]:clone()
@@ -310,13 +313,26 @@ function eval_val()
     local sol = getOneHotLab2(mi, true, opt.max_n)
     local predConstr = evalBatchConstraints(sol)
     sol = sol:reshape(opt.mini_batch_size, opt.max_n*opt.nClasses, 1) -- make batches of column vectors
-    local cmtr = costs:reshape(opt.mini_batch_size, opt.featmat_n, opt.featmat_m)
-    local predObj = evalBatchQP(sol, cmtr)
+    local cmtr = nil
+    if opt.problem=='linear' then
+      cmtr = costs:reshape(opt.mini_batch_size, 1, opt.featmat_n*opt.featmat_m)
+    elseif opt.problem=='quadratic' then
+      cmtr = costs:reshape(opt.mini_batch_size, opt.featmat_n, opt.featmat_m)
+    end    
+    local predObj = evalBatchEnergy(sol, cmtr)
 
     local predEnergy = predObj - predConstr * opt.mu
 --    print((5-torch.mean(predEnergy,1):squeeze()))
-    eval_predMeanEnergy = eval_predMeanEnergy + (5-torch.mean(predEnergy,1):squeeze())
-            
+    eval_predMeanEnergy = eval_predMeanEnergy + (energyOffset-torch.mean(predEnergy,1):squeeze())
+    
+  -- PROJECT FOR PLOTTING
+    local projSol = zeroTensor3(opt.mini_batch_size, opt.max_n * opt.max_m,1)
+    for m=1,opt.mini_batch_size do
+      local ass = hungarianL(-predDA[m]):narrow(2,2,1):t()
+      projSol[m] = getOneHotLab(ass,true,opt.max_n):reshape(opt.max_n * opt.max_m,1)
+    end  
+    local predEnergy = evalBatchEnergy(projSol, cmtr)
+    eval_predMeanEnergyProj = eval_predMeanEnergyProj + (energyOffset-torch.mean(predEnergy,1):squeeze())            
 
 
     if seq==plotSeq then
@@ -329,8 +345,9 @@ function eval_val()
   end
   loss = loss / T / tL  -- make average over all frames
   eval_predMeanEnergy = eval_predMeanEnergy / tL
+  eval_predMeanEnergyProj = eval_predMeanEnergyProj / tL
 
-  return loss, eval_predMeanEnergy
+  return loss, eval_predMeanEnergy, eval_predMeanEnergyProj
 end
 
 
@@ -349,6 +366,8 @@ function feval()
   --  randSeq = math.random(tL) -- pick a random sequence from training set
   costs = TrCostTab[randSeq]:clone()
   huns = TrSolTab[randSeq]:clone()
+--  print(huns)
+--  abort()
 
   TRAINING = true
   ----- FORWARD ----
@@ -371,41 +390,130 @@ function feval()
     rnn_state[t] = {}
     for i=1,#init_state do table.insert(rnn_state[t], lst[i]) end -- extract the state, without output
     DA[t] = decode(predictions, t)
-    local input, output = getPredAndGTTables(DA[t], t)
-
-    local tloss = clones.criterion[t]:forward(input, output)
-    loss = loss + tloss
+--    local input, output = getPredAndGTTables(DA[t], t)
+--
+--    local tloss = clones.criterion[t]:forward(input, output)
+--    loss = loss + tloss
   end
-  loss = loss / T -- make average over all frames
+--  loss = loss / T -- make average over all frames
   local predDA = decode(predictions)
   --   if opt.mini_batch_size>1 then predDA=predDA:sub(1,opt.max_n) end
   local mv, mi = torch.max(predDA,3)
 --  print(mi)
 
   -- get prediction energy
+--  print(predDA)
   local sol = getOneHotLab2(mi, true, opt.max_n)
-  local predConstr = evalBatchConstraints(sol)
-  sol = sol:reshape(opt.mini_batch_size, opt.max_n*opt.nClasses, 1) -- make batches of column vectors
-  local cmtr = costs:reshape(opt.mini_batch_size, opt.featmat_n, opt.featmat_m)
-  local predObj = evalBatchQP(sol, cmtr)
-
-  -- get ground truth energy  
-  local GTConstr = evalBatchConstraints(huns:reshape(opt.mini_batch_size, opt.max_n, opt.max_m))
-  local solGT = huns:reshape(opt.mini_batch_size, opt.max_n*opt.nClasses, 1) -- make batches of column vectors
-  local GTObj = evalBatchQP(solGT, cmtr)  
+--  print(sol)
   
+--  if opt.project_valid ~= 0 then
+--    local projSol = sol:clone()  
+--    for m=1,opt.mini_batch_size do
+--      local ass = hungarianL(predDA[m]):narrow(2,1,1):t()
+--      projSol[m] = getOneHotLab(ass,true,opt.max_n)
+--    end
+--    sol = projSol:clone()
+--  end
+--  print(sol)
+  
+  local predConstr = evalBatchConstraints(sol)
+--  print(predConstr)
+  sol = sol:reshape(opt.mini_batch_size, opt.max_n*opt.nClasses, 1) -- make batches of column vectors
+  local cmtr = nil
+  if opt.problem=='linear' then
+    cmtr = costs:reshape(opt.mini_batch_size, 1, opt.featmat_n*opt.featmat_m)
+  elseif opt.problem=='quadratic' then
+    cmtr = costs:reshape(opt.mini_batch_size, opt.featmat_n, opt.featmat_m)
+  end
+  
+  local predObj = evalBatchEnergy(sol, cmtr)
+
+--print(huns)
+--abort()
+  -- get ground truth energy
+  local hOneHot = huns:clone()
+  if opt.solution == 'integer' then hOneHot =  getOneHotLab2(huns, opt.mini_batch_size>1, opt.nClasses) end
+
+--  if opt.project_valid ~= 0 then
+--    local projSol = hOneHot:clone()    
+--    for m=1,opt.mini_batch_size do
+--      local ass = hungarianL(hOneHot[m]:reshape(opt.max_n,opt.max_m)):narrow(2,2,1):t()
+--      projSol[m] = getOneHotLab(ass,true,opt.max_n)
+--    end
+--    hOneHot = projSol:clone()
+--  end
+  
+  local GTConstr = evalBatchConstraints(hOneHot:reshape(opt.mini_batch_size, opt.max_n, opt.max_m))
+--  print(GTConstr)  
+  local solGT = hOneHot:reshape(opt.mini_batch_size, opt.max_n*opt.nClasses, 1) -- make batches of column vectors
+  local GTObj = evalBatchEnergy(solGT, cmtr)  
+  
+--  print(predObj)
+--  print(predConstr)
   local predEnergy = predObj - predConstr * opt.mu
   local GTEnergy = GTObj - GTConstr * opt.mu
+--  print(predObj)
+--  print(predConstr)
 --  print(predEnergy)
-  predMeanEnergy = 5-torch.mean(predEnergy,1):squeeze()
+  predMeanEnergy = energyOffset-torch.mean(predEnergy,1):squeeze()
+  GTMeanEnergy = energyOffset-torch.mean(GTEnergy,1):squeeze()   
+  
 --  abort()
 --  print(GTEnergy)
-  local energies = predEnergy:cat(GTEnergy, 3)
+--  local energies = predEnergy:cat(GTEnergy, 3) -- [PRED, GT]
+  local energies = GTEnergy:cat(predEnergy, 3) -- [GT, PRED]
 --  print(energies)
+--  print((energies:narrow(3,1,1) - energies:narrow(3,2,1)):eq(0))
   
   local solv, takeSol = torch.max(energies, 3)
-  takeSol=takeSol:reshape(opt.mini_batch_size, 1):eq(1) -- keep prediction?
-  huns[takeSol:expand(opt.mini_batch_size, opt.max_n*opt.nClasses)] = sol:clone()
+--  print(solv)
+--  print(takeSol)
+  takeSol=takeSol:reshape(opt.mini_batch_size, 1):eq(2) -- keep prediction?
+--  print(takeSol:t())
+  
+--  abort()
+
+  -- PROJECT FOR PLOTTING
+--  print(predDA)
+--  print(huns)
+--  abort()
+  local projSol = zeroTensor3(opt.mini_batch_size, opt.max_n * opt.max_m,1)
+  local projGT = zeroTensor3(opt.mini_batch_size, opt.max_n * opt.max_m,1)
+  for m=1,opt.mini_batch_size do
+    local ass = hungarianL(-predDA[m]):narrow(2,2,1):t()
+--    print(projSol[m])
+--    print(getOneHotLab(ass,true,opt.max_n):reshape(opt.max_n * opt.max_m,1))
+    projSol[m] = getOneHotLab(ass,true,opt.max_n):reshape(opt.max_n * opt.max_m,1)
+    ass = hungarianL(huns[m]:reshape(opt.max_n,opt.max_m)):narrow(2,2,1):t()
+    projGT[m] = getOneHotLab(ass,true,opt.max_n):reshape(opt.max_n * opt.max_m,1)
+  end
+--  print(projSol)
+--  print(projGT)
+  local predEnergy = evalBatchEnergy(projSol, cmtr)
+  local GTEnergy = evalBatchEnergy(projGT, cmtr)
+  predMeanEnergyProj = energyOffset-torch.mean(predEnergy,1):squeeze()
+  GTMeanEnergyProj = energyOffset-torch.mean(GTEnergy,1):squeeze()
+
+  if opt.grad_replace ~= 0 then
+    if opt.solution=='distribution' then
+      if opt.inference == 'map' then 
+        huns[takeSol:expand(opt.mini_batch_size, opt.max_n*opt.nClasses)] = sol:clone()
+      elseif opt.inference == 'marginal' then
+        if opt.project_valid ~= 0 then
+          huns[takeSol:expand(opt.mini_batch_size, opt.max_n*opt.nClasses)] = predDA:reshape(opt.mini_batch_size, opt.max_n* opt.nClasses)
+        else
+          huns[takeSol:expand(opt.mini_batch_size, opt.max_n*opt.nClasses)] = torch.exp(predDA:reshape(opt.mini_batch_size, opt.max_n* opt.nClasses))
+        end
+      end
+    elseif opt.solution == 'integer' then
+      huns[takeSol:expand(opt.mini_batch_size, opt.max_n)] = mi:reshape(opt.mini_batch_size, opt.nClasses)
+    end    
+  end
+  
+
+  
+--  print(huns)
+--  sleep(1)
 --  print(takeSol)
   
   -- plotting
@@ -415,7 +523,15 @@ function feval()
 --    print(predictions)
     feval_mm = plotProgress(predictions,1,'Train')
     --    feval_mm = getDAErrorHUN(predDA:reshape(opt.max_n,1,opt.nClasses), hun:reshape(opt.max_n,1))
+--    if globiter>1 then abort() end
   end
+  
+  for t=1,T do
+    local input, output = getPredAndGTTables(DA[t], t)--
+    local tloss = clones.criterion[t]:forward(input, output)
+    loss = loss + tloss
+  end
+  loss = loss / T -- make average over all frames
 
 
   ------ BACKWARD ------
@@ -460,8 +576,8 @@ end
 
 
 
-train_energies = {}
-val_energies = {}
+train_energies, val_energies, gt_energies = {}, {}, {}
+train_energies_proj, val_energies_proj, gt_energies_proj = {}, {}, {}
 train_losses = {}
 val_losses = {}
 real_losses = {}
@@ -478,14 +594,17 @@ for i = 1, opt.max_epochs do
   
 --  if i>1 and (i-1)%opt.synth_training==0 and opt.random_epoch~=0 then
 
-  -- replace GT
-  if i == 1 or (i-1)%opt.synth_training == 0 then
-    mBstMar = mBstMar + 1
-    if mBstMar>10 then mBstMar = 1 end
-    pm('Replacing GT with '.. mBstMar .. '-best Marginals')
-    local mBstField = string.format('all_%d_BestMarginals',mBstMar)
-    for k,v in pairs(TrSolTab_m_BestMarginals[mBstMar]) do TrSolTab[k] = v end
---    for k,v in pairs(TrSolTab_m_BestMarginals[mBst]) do TrSolTab[k] = v end
+  -- replace GT  
+  if opt.inference == 'marginal' and opt.problem == 'quadratic' and opt.diverse_solutions ~= 0 then
+    if i == 1 or (i-1)%opt.synth_training == 0 then
+      mBstMar = mBstMar + 1
+      if mBstMar>10 then mBstMar = 1 end
+--      if opt.diverse_solutions == 0 then mBstMar = 10 end
+      pm('Replacing GT with '.. mBstMar .. '-best Marginals')
+      local mBstField = string.format('all_%d_BestMarginals',mBstMar)
+      for k,v in pairs(TrSolTab_m_BestMarginals[mBstMar]) do TrSolTab[k] = v end
+  --    for k,v in pairs(TrSolTab_m_BestMarginals[mBst]) do TrSolTab[k] = v end
+    end
   end
 
   local timer = torch.Timer()
@@ -495,6 +614,9 @@ for i = 1, opt.max_epochs do
   local train_loss = loss[1] -- the loss is inside a list, pop it
   train_losses[i] = train_loss
   train_energies[i] = predMeanEnergy
+  gt_energies[i] = GTMeanEnergy
+  train_energies_proj[i] = predMeanEnergyProj
+  gt_energies_proj[i] = GTMeanEnergyProj
   
 
   -- exponential learning rate decay
@@ -510,7 +632,7 @@ for i = 1, opt.max_epochs do
   -- print training progress
   if i % opt.print_every == 0 then
     printTrainingStats(i, opt.max_epochs, train_loss, grad_params:norm() / params:norm(),
-      time, optim_state.learningRate, glTimer:time().real)
+      time, optim_state.learningRate, glTimer:time().real, predMeanEnergy)
   end
 
 
@@ -526,9 +648,10 @@ for i = 1, opt.max_epochs do
     plot_real_loss_x, plot_real_loss = getValLossPlot(real_losses)
 
     -- evaluate validation set
-    val_loss, val_energy = eval_val()
+    val_loss, val_energy, val_energy_proj = eval_val()
     val_losses[i] = math.max(val_loss, 1e-5)
     val_energies[i] = val_energy
+    val_energies_proj[i] = val_energy_proj
     
 
     train_mm[i] = feval_mm+1
@@ -550,32 +673,29 @@ for i = 1, opt.max_epochs do
     
     local _, plot_energies = getLossPlot(i, opt.eval_val_every, train_energies)  
     local _, plot_val_energies = getValLossPlot(val_energies)
+    local _, plot_gt_energies = getLossPlot(i, opt.eval_val_every, gt_energies)
+    local _, plot_energies_proj = getLossPlot(i, opt.eval_val_every, train_energies_proj)  
+    local _, plot_val_energies_proj = getValLossPlot(val_energies_proj)
 
     --       print(train_losses)
     --       print(plot_loss)
-    local minTrainLoss, minTrainLossIt = torch.min(plot_loss,1)
-    local minValidLoss, minValidLossIt = torch.min(plot_val_loss,1)
-    local minRealLoss, minRealLossIt = torch.min(plot_real_loss,1)
-    minTrainLoss=minTrainLoss:squeeze()
-    minTrainLossIt=minTrainLossIt:squeeze()*opt.eval_val_every
-    minValidLoss=minValidLoss:squeeze()
-    minValidLossIt=minValidLossIt:squeeze()*opt.eval_val_every
-    minRealLoss=minRealLoss:squeeze()
-    minRealLossIt=minRealLossIt:squeeze()*opt.eval_val_every
+    local minTrainLoss, minTrainLossIt = minValAndIt(plot_loss)
+    local minValidLoss, minValidLossIt = minValAndIt(plot_val_loss)
+    local minRealLoss, minRealLossIt = minValAndIt(plot_real_loss)
 
-    local minTrainEnergy, minTrainEnergyIt = torch.min(plot_energies,1)
-    local minValidEnergy, minValidEnergyIt = torch.min(plot_val_energies,1)
-    minTrainEnergy=minTrainEnergy:squeeze()
-    minTrainEnergyIt=minTrainEnergyIt:squeeze()*opt.eval_val_every
-    minValidEnergy=minValidEnergy:squeeze()
-    minValidEnergyIt=minValidEnergyIt:squeeze()*opt.eval_val_every
+
+    local minTrainEnergy, minTrainEnergyIt = minValAndIt(plot_energies)
+    local minValidEnergy, minValidEnergyIt = minValAndIt(plot_val_energies)
+    local minGTEnergy, minGTEnergyIt = minValAndIt(plot_gt_energies)
+    local minTrainEnergyProj, minTrainEnergyItProj = minValAndIt(plot_energies_proj)
+    local minValidEnergyProj, minValidEnergyItProj = minValAndIt(plot_val_energies_proj)
 
 
     pm('--------------------------------------------------------')
-    pm(string.format('%10s%10s%10s','Energies','Training','Valid'))
-    pm(string.format('%10s%10.2f%10.2f','Current',plot_energies[-1],val_energy))
-    pm(string.format('%10s%10.2f%10.2f','Best',minTrainEnergy,  minValidEnergy))
-    pm(string.format('%10s%10d%10d','Iter',minTrainEnergyIt,  minValidEnergyIt))
+    pm(string.format('%10s%10s%10s%10s%10s%10s','Energies','Training','Valid','GT','Tr-Prj','Val-Prj'))
+    pm(string.format('%10s%10.2f%10.2f%10.2f%10.2f%10.2f','Current',plot_energies[-1],val_energy,plot_gt_energies[-1],plot_energies_proj[-1],plot_val_energies_proj[-1]))
+    pm(string.format('%10s%10.2f%10.2f%10.2f%10.2f%10.2f','Best',minTrainEnergy,  minValidEnergy,minGTEnergy,minTrainEnergyProj,minValidEnergyProj))
+    pm(string.format('%10s%10d%10d%10d%10d%10d','Iter',minTrainEnergyIt,  minValidEnergyIt, minGTEnergyIt,minTrainEnergyItProj, minValidEnergyItProj))
     pm('--------------------------------------------------------')
     pm(string.format('%10s%10s%10s%10s','Losses','Training','Valid','Real'))
     pm(string.format('%10s%10.5f%10.5f%10.5f','Current',plot_loss[-1],val_loss,real_loss))
@@ -620,12 +740,9 @@ for i = 1, opt.max_epochs do
 --      getData(opt, true, true)
 --    end    
     
-    local minTrainLoss, minTrainLossIt = torch.min(plot_train_mm,1)
-    local minValidLoss, minValidLossIt = torch.min(plot_val_mm,1)
-    local minRealLoss, minRealLossIt = torch.min(plot_real_mm,1)
-    minTrainLoss=minTrainLoss:squeeze()      minTrainLossIt=minTrainLossIt:squeeze()*opt.eval_val_every
-    minValidLoss=minValidLoss:squeeze()      minValidLossIt=minValidLossIt:squeeze()*opt.eval_val_every
-    minRealLoss=minRealLoss:squeeze()        minRealLossIt=minRealLossIt:squeeze()*opt.eval_val_every
+    local minTrainLoss, minTrainLossIt = minValAndIt(plot_train_mm)
+    local minValidLoss, minValidLossIt = minValAndIt(plot_val_mm)
+    local minRealLoss, minRealLossIt = minValAndIt(plot_real_mm)
 
     pm('--------------------------------------------------------')
     pm(string.format('%10s%10s%10s%10s','MissDA','Training','Valid','Real'))
@@ -656,11 +773,12 @@ for i = 1, opt.max_epochs do
 
     -- plot
     local lossPlotTab = {}
-    table.insert(lossPlotTab, {"Trng loss",plot_loss_x,plot_loss, 'with linespoints lt 1'})
-    table.insert(lossPlotTab, {"Vald loss",plot_val_loss_x, plot_val_loss, 'with linespoints lt 3'})
+    
+--    table.insert(lossPlotTab, {"Trng loss",plot_loss_x,plot_loss, 'with linespoints lt 1'})
+--    table.insert(lossPlotTab, {"Vald loss",plot_val_loss_x, plot_val_loss, 'with linespoints lt 3'})
     --       table.insert(lossPlotTab, {"Real loss",plot_real_loss_x, plot_real_loss, 'linespoints lt 5'})
-    table.insert(lossPlotTab, {"Trng MM",plot_train_mm_x, plot_train_mm, 'with points lt 1'})
-    table.insert(lossPlotTab, {"Vald MM",plot_val_mm_x, plot_val_mm, 'with points lt 3'})
+    table.insert(lossPlotTab, {"Trng MM",plot_train_mm_x, plot_train_mm+.1, 'with points lt 1'})
+    table.insert(lossPlotTab, {"Vald MM",plot_val_mm_x, plot_val_mm-.1, 'with points lt 3'})
     --       table.insert(lossPlotTab, {"Real MM",plot_real_mm_x, plot_real_mm, 'points lt 5'})
 
     --       table.insert(lossPlotTab, {"Trng MA",plot_train_ma_x, plot_train_ma, 'points pt 1'})
@@ -670,12 +788,23 @@ for i = 1, opt.max_epochs do
     table.insert(lossPlotTab, {"Trng E",plot_loss_x,plot_energies/opt.mu, 'with linespoints lt 4'})
 --    print(plot_val_loss_x, plot_val_energies)
     table.insert(lossPlotTab, {"Vald E",plot_val_loss_x, plot_val_energies/opt.mu, 'with linespoints lt 5'})
+    table.insert(lossPlotTab, {"GT E",plot_loss_x, plot_gt_energies/opt.mu, 'with linespoints lt 6'})
+    table.insert(lossPlotTab, {"Trng E-proj",plot_loss_x,plot_energies_proj/opt.mu, 'with linespoints lt 7'})
+    table.insert(lossPlotTab, {"Vald E-proj",plot_val_loss_x, plot_val_energies_proj/opt.mu, 'with linespoints lt 8'})
     
     --  local minInd = math.min(1,plot_loss:nElement())
     local maxY = math.max(torch.max(plot_loss), torch.max(plot_val_loss), torch.max(plot_real_loss),
       torch.max(plot_train_mm), torch.max(plot_val_mm), torch.max(plot_real_mm))*2
     local minY = math.min(torch.min(plot_loss), torch.min(plot_val_loss), torch.min(plot_real_loss),
       torch.min(plot_train_mm), torch.min(plot_val_mm), torch.min(plot_real_mm))/2
+      
+    
+    local minY, maxY = minMax(plot_train_mm, plot_val_mm, plot_energies/opt.mu, plot_val_energies/opt.mu, plot_gt_energies/opt.mu,
+                              plot_energies_proj/opt.mu, plot_val_energies_proj/opt.mu)
+    minY = math.max(0.001, minY/2)
+    maxY=maxY*2
+--    print(minY, maxY)
+--    abort()
     rangeStr = string.format("set xrange [%d:%d];set yrange [%f:%f]",
       opt.eval_val_every-1, i+1, minY, maxY)
     --       rangeStr = string.format("set yrange [%f:%f]", minY, maxY)

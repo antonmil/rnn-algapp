@@ -2,19 +2,20 @@
 --- Prints column names for process table
 function printTrainingHeadline()
   local headline = 
-    string.format("%14s%10s%8s%9s%8s%6s%6s","Iter.","Tr. loss","G-norm","tm/btch","l-rate","ETL","TELP")
+    string.format("%14s%10s%8s%9s%8s%6s%6s%8s","Iter.","Tr. loss","G-norm","tm/btch","l-rate","ETL","TELP","Tr-En.")
   print(headline)
 end
 
 --------------------------------------------------------------------------
 --- Prints numbers for current iteration
 -- @param sec 	Seconds passed since start
-function printTrainingStats(i, me, tl, gn, t, lr, sec)
+function printTrainingStats(i, me, tl, gn, t, lr, sec, gten)
+  gten = gten or 0
   local secLeft = (sec / (i/opt.max_epochs) - sec)
   local hrsLeft, minLeft = secToHM(secLeft)
   local hrsElapsed, minElapsed = secToHM(sec)
   
-  print(string.format("%6d/%7d%10.5f %.1e%8.2fs %.1e%3d:%02d%3d:%02d", i, me, tl, gn, t,lr, hrsLeft,minLeft,hrsElapsed,minElapsed))
+  print(string.format("%6d/%7d%10.5f %.1e%8.2fs %.1e%3d:%02d%3d:%02d%8.2f", i, me, tl, gn, t,lr, hrsLeft,minLeft,hrsElapsed,minElapsed,gten))
 end
 
 
