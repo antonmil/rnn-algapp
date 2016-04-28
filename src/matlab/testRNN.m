@@ -1,20 +1,21 @@
 %%
 addpath(genpath('.'))
-nRuns = 10;
+nRuns = 1;
 
 rng(321);
 if ~exist('Pair_M','var')
     Pair_M=doMatching();
 end
 
-N=6;
-rnnSize = 32;
-numLayers = 1;
+N=8;
+rnnSize = 64;
+numLayers = 2;
 solIndex = 2; % 1=integer, 2=distribution
 infIndex = 2; % 1=map, 2=marginal
 [gurModel, gurParams] = getGurobiModel(N);
-model_sign = sprintf('mt1_r%d_l%d_n%d_m%d_o2_s%d_i%d',rnnSize, numLayers, N,N, solIndex, infIndex);
+model_sign = sprintf('mt1_r%d_l%d_n%d_m%d_o2_s%d_i%d_valen',rnnSize, numLayers, N,N, solIndex, infIndex);
 model_name = 'trainHun';
+model_name = '0428Ad-3';
 mBst = 10;
 
 runInfos.allAcc=zeros(1,nRuns);

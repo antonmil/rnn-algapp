@@ -693,7 +693,7 @@ function prepData(tab)
 --  end
 
   if opt.invert_input ~= 0 then
-    local invInd = torch.linspace(opt.inSize,1,opt.inSize):long()
+    local invInd = torch.linspace(tab[1]:size(2),1,tab[1]:size(2)):long()
     for k,v in pairs(tab) do tab[k] = v:index(2,invInd) end
   end
   
@@ -1030,7 +1030,7 @@ function printDebugValues(C, Pred)
     --  print(NNcost,HAcost,Marcost,PMarcost)
     print(string.format('%5s%5.1f%5.1f%5.1f%5.1f%5d|','Sum',NNcost,HAcost,Marcost,PMarcost,MMsum))
   elseif opt.problem=='quadratic' then
-    if N<4 and M<4 then
+    if N<2 and M<2 then
       print('QBP')
 
 
@@ -1274,5 +1274,11 @@ function minValAndIt(values)
   local mv, mi = torch.min(values,1)
   mv=mv:squeeze()
   mi=mi:squeeze()*opt.eval_val_every
+  return mv, mi
+end
+
+function maxValAndIt(values)
+  local mv, mi = minValAndIt(-values)
+  mv = -mv
   return mv, mi
 end
