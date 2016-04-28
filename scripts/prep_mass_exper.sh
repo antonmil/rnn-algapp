@@ -26,11 +26,11 @@ cp ../config/range_template.txt ../config/$basename'-range.txt'
 # ./clone_conf.sh $name
 # ./set_param_range.sh lrng_rate 0.00020 0.00180 9 $name
 
-while IFS=, read set pname from to n;do
+while IFS=, read set pname from to n logsp;do
   name=$basename$set
   cp ../config/conf_template.txt ../config/$name-1.txt
   ./clone_conf.sh $name $n
-  ./set_param_range.sh $pname $from $to $n $name
+  ./set_param_range.sh $pname $from $to $n $name $logsp
 
   echo $name
   echo $set
@@ -38,6 +38,7 @@ while IFS=, read set pname from to n;do
   echo $from
   echo $to
   echo $n
+  echo $logsp
 
   ##SUBMIT!!!
   if [[ $2 -eq 1 ]]

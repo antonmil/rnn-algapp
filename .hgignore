@@ -6,6 +6,7 @@ docs/*
 out/*
 tmp/*
 data/*
+logs/*
 config/*
 nngraph_*
 *.dot
