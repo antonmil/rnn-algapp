@@ -187,6 +187,8 @@ for ttm=ttmodes
         data.allnnz(n,1) = nnz;
         data.allSparseQ(n,1:nnz*2) = torchSparse(:)';
         data.allc(n,:) = c;
+%         result.x'
+%         pause
         data.allSol(n,:) = result.x';
         data.allSolTimes(n,1) = result.runtime;
         if doMarginals

@@ -1,7 +1,8 @@
-function [asgIpfpSMbst, allMarginals] = mBestIPFP(K, Mbst)
+function [asgIpfpSMbst, allMarginals] = mBestIPFP(K, Mbst, assOrder)
 %%
 % Mbest parameters
 if nargin<2, Mbst=20; end
+
 param.mbest=Mbst;
 param.chck_sols=1;
 
@@ -11,6 +12,9 @@ param.chck_sols=1;
 n = sqrt(size(K,1));
 Ct = ones(n);
 asgT.X = eye(n);
+
+if nargin<3, assOrder = 1:n; end
+asgT.X = asgT.X(assOrder',:)';
 
 %% algorithm parameter
 [pars, algs] = gmPar(2);

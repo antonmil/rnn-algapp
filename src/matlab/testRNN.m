@@ -1,22 +1,24 @@
 %%
 addpath(genpath('.'))
-nRuns = 1;
+nRuns = 10;
 
 rng(321);
 if ~exist('Pair_M','var')
     Pair_M=doMatching();
 end
 
-N=8;
-rnnSize = 64;
-numLayers = 2;
-solIndex = 2; % 1=integer, 2=distribution
-infIndex = 2; % 1=map, 2=marginal
+N=5;
+rnnSize = 32;
+numLayers = 1;
+solIndex = 1; % 1=integer, 2=distribution
+infIndex = 1; % 1=map, 2=marginal
 [gurModel, gurParams] = getGurobiModel(N);
 model_sign = sprintf('mt1_r%d_l%d_n%d_m%d_o2_s%d_i%d_valen',rnnSize, numLayers, N,N, solIndex, infIndex);
 model_name = 'trainHun';
-model_name = '0428Ad-3';
+% model_name = '0428Bg-4';
 mBst = 10;
+doRandomize = true;
+% doRandomize = false;
 
 runInfos.allAcc=zeros(1,nRuns);
 runInfos.gurAcc=zeros(1,nRuns);
@@ -46,41 +48,63 @@ asgT.X=eye(N);
 
 for r = 1:nRuns
     fprintf('.');
-    RM = Pair_M{1,randi(length(Pair_M))};
+%     rng(321);
+    RM = Pair_M{1,randi(length(Pair_M))};    
     [newK,gurResult] = selectSubset(RM, N, true, gurModel, gurParams);
+
     runInfos.gurTime(r) = gurResult.runtime;
     [gurMat, gurAss] = getOneHot(gurResult.x);
+
+    % randomize
+    newAss = 1:N;
+    if doRandomize
+        canSol = eye(N);
+        [newK, newSol, newOrder]=permuteResult(newK, canSol(:)');
+        [newSolMat, newAss] = getOneHot(newSol);
+        asgT.X = eye(N);   
+        asgT.X = asgT.X(newAss',:);
+        gurModel.Q = newK;
+        gurResult = gurobi(gurModel, gurParams);
+        runInfos.gurTime(r) = gurResult.runtime;    
+        [gurMat, gurAss] = getOneHot(gurResult.x);
+    end
+    
     if length(unique(gurAss)) ~= length(gurAss)
 %         fprintf('Gurobi solution not one-to-one!\n')
     end
     
     % marg
-    asgIpfpSMbst = mBestIPFP(newK,mBst);
-    mbstVec = reshape(asgIpfpSMbst.Xmbst',N*N,1);
+    asgIpfpSMbst = mBestIPFP(newK,mBst,newAss);
+    mbstVec = reshape(asgIpfpSMbst.Xmbst,N*N,1);
     runInfos.mbstTime(r) = sum(asgIpfpSMbst.time);
     runInfos.mbstObj(r) = mbstVec' * newK * mbstVec;
-    runInfos.mbstAcc(r) = matchAsg(asgIpfpSMbst.Xmbst, asgT);
+    runInfos.mbstAcc(r) = matchAsg(asgIpfpSMbst.Xmbst', asgT);
     
     thun = tic;
     [matchHun, costHun] = hungarian(-asgIpfpSMbst.marginals);
     thun=toc(thun);
-    hunVec = reshape(matchHun',N*N,1);
+    hunVec = reshape(matchHun,N*N,1);
     runInfos.mbstHATime(r) = runInfos.mbstTime(r) + thun;
     runInfos.mbstHAObj(r) = hunVec' * newK * hunVec;
-    runInfos.mbstHAAcc(r) = matchAsg(matchHun, asgT);      
+    runInfos.mbstHAAcc(r) = matchAsg(matchHun', asgT);
     
     % IPFP 'best'
-    IPFPVec = reshape(asgIpfpSMbst.X(:,:,1)',N*N,1);    
-    runInfos.IPFPTime(r) = asgIpfpSMbst.time(1);
+    [pars, algs] = gmPar(2);
+    
+    Ct = ones(sqrt(size(newK,1)));    
+    asgIpfpS = gm(newK, Ct, asgT, pars{6}{:});
+
+    IPFPVec = reshape(asgIpfpS.X,N*N,1);
+    runInfos.IPFPTime(r) = asgIpfpS.tim;
     runInfos.IPFPObj(r) = IPFPVec' * newK * IPFPVec;
-    runInfos.IPFPAcc(r) = matchAsg(asgIpfpSMbst.X(:,:,1), asgT);
+    runInfos.IPFPAcc(r) = matchAsg(asgIpfpS.X', asgT);
 
     % IPFP 'opt-out-of-m'
     [~,m] = max(asgIpfpSMbst.obj);
-    moptVec = reshape(asgIpfpSMbst.X(:,:,m)',N*N,1);
+    moptVec = reshape(asgIpfpSMbst.X(:,:,m),N*N,1);
     runInfos.moptTime(r) = sum(asgIpfpSMbst.time);
     runInfos.moptObj(r) = moptVec' * newK * moptVec;
-    runInfos.moptAcc(r) = matchAsg(asgIpfpSMbst.X(:,:,m), asgT);
+    runInfos.moptAcc(r) = matchAsg(asgIpfpSMbst.X(:,:,m)', asgT);
     
     try
     cmd = sprintf('cd ..; pwd; th %s.lua -model_name %s -model_sign %s -suppress_x 1','test', model_name , model_sign);
@@ -95,6 +119,7 @@ for r = 1:nRuns
 %     resRaw(:,1) = reshape(reshape(resRaw(:,1),N,N)',N*N,1);
     resVec = resRaw(:,1);
     [myResMat, myAss] = getOneHot(resVec);
+%     myAss
     if length(unique(myAss)) ~= length(myAss)
 %         fprintf('RNN solution not one-to-one!\n')
     end

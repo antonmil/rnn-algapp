@@ -3,6 +3,7 @@ function [newK,newResult, newOrder]=permuteResult(K, result)
 
 fullN=sqrt(size(K,1)); fullM=fullN;
 newOrder= randperm(fullN);
+% newOrder = 1:fullN
 N=fullN; 
 M=N;
 

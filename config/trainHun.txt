@@ -1,8 +1,8 @@
           model_index  1
              rnn_size  32
            num_layers  1
-                max_n  3
-              problem  linear
+                max_n  5
+              problem  quadratic
             inference  map
              solution  integer
                sparse  0
@@ -20,13 +20,13 @@
                   vel  0
               fixed_n  1
                lambda  1
-                   mu  100
+                   mu  10
                
             init_from  
         training_file  
            max_epochs  5000
       mini_batch_size  10
-       synth_training  50
+       synth_training  888
           synth_valid  10
              full_set  0
 
@@ -49,9 +49,9 @@
           dummy_noise  0
            train_type  0
           
-          print_every  10
-       eval_val_every  100
-           plot_every  100
+          print_every  100
+       eval_val_every  1000
+           plot_every  1000
               dropout  0.1
              temp_win  4
            suppress_x  0
@@ -67,7 +67,7 @@
           trim_tracks  0
             grad_clip  1
             lrng_rate  .001
-      lrng_rate_decay  0.9
+      lrng_rate_decay  0.95
 lrng_rate_decay_after  -1
          rand_par_rng  .08
           forget_bias  1

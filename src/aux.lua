@@ -358,9 +358,9 @@ function readQBPData(ttmode, mBst)
     for mb=1,opt.mini_batch_size do
       nth=nth+1
       if nth>maxTrainingSample then nth=1 end
---      print(allQ[nth])
+--      print(allSol[nth])
 --      print(allSparseQ[nth])
---      abort()
+--      sleep(1)
       local oneQ = allQ[nth]:reshape(1,opt.inSize),1
       oneBatch = oneBatch:cat(allQ[nth]:reshape(1,opt.inSize),1)
       oneBatchSol = oneBatchSol:cat(allSol[nth]:reshape(1,opt.solSize),1)
@@ -595,17 +595,19 @@ function getData(opt, getTraining, getValidation)
     ----- gen data for Hungarian
     if getTraining then TrCostTab,TrSolTab = genHunData(opt.synth_training) end
     if getValidation then ValCostTab,ValSolTab = genHunData(opt.synth_valid) end
-  elseif opt.problem == 'quadratic' then
+  elseif opt.problem == 'quadratic'  then
     if getTraining and getValidation then
       TrCostTab,TrSolTab,ValCostTab,ValSolTab = readQBPData('train')
       -- mbest marginals
-      TrSolTab_m_BestMarginals, ValSolTab_m_BestMarginals = {}, {}
-      for m = 1,10 do
-        TrSolTab_m_BestMarginals[m], ValSolTab_m_BestMarginals[m] = {}, {}
-        TrSolTab_m_BestMarginals[m], ValSolTab_m_BestMarginals[m] =  readQBPallMBstMarginals('train',m)
---        print(m)
---        print(TrSolTab_m_BestMarginals[m][1])
---        abort()
+      if opt.solution == 'marginal' then
+        TrSolTab_m_BestMarginals, ValSolTab_m_BestMarginals = {}, {}
+        for m = 1,10 do
+          TrSolTab_m_BestMarginals[m], ValSolTab_m_BestMarginals[m] = {}, {}
+          TrSolTab_m_BestMarginals[m], ValSolTab_m_BestMarginals[m] =  readQBPallMBstMarginals('train',m)
+  --        print(m)
+  --        print(TrSolTab_m_BestMarginals[m][1])
+  --        abort()
+        end
       end
 --      print(#TrSolTab_m_BestMarginals)
 --      print(#ValSolTab_m_BestMarginals)

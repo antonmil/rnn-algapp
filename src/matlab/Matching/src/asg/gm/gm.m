@@ -50,10 +50,11 @@ XC = gmPosC(K, Ct, X0, parPosC);
 
 % continous -> discrete
 
-% make sure m <= N!
-parPosD.mbst = min(parPosD.mbst, factorial(size(Ct,1)));
 
 if strcmp(parPosD.alg,'ipfp_mbst')
+    % make sure m <= N!
+    parPosD.mbst = min(parPosD.mbst, factorial(size(Ct,1)));
+
     [Xm,objm,tme] = gmPosD_m(K, Ct, XC, parPosD);
     
     xvs = objm - min(objm);
