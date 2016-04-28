@@ -17,6 +17,7 @@ fi
 
 # transform from and to to log
 if [[ $logsp -ne 0 ]]; then
+  echo $from
   from=`echo "l($from)" | bc -l`
   to=`echo "l($to)" | bc -l`
 fi
@@ -24,7 +25,7 @@ fi
 for i in $(eval echo "{1..$n}")
 do
 #   echo $i
-  ipol=`echo "($i-1) * ($to-$from) / ($n-1)" | bc -l`
+  ipol=`echo "($i - 1) * ($to - $from) / ($n-1)" | bc -l`
 #   echo $ipol
   val=`echo "$from+$ipol" | bc -l`
   

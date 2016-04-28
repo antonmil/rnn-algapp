@@ -77,12 +77,16 @@ for k,v in pairs(parRanges) do
   local from = v[3]
   local to = v[4]
   local n = v[5]
+  local logsp = v[6]
   
   
   local allMota = {}
   local allExper = {}
   
   local prange = torch.linspace(from,to,n)
+  if logsp ~= 0 then
+	prange = torch.exp(torch.linspace(torch.log(from), torch.log(to), n))
+  end
   local pstep = prange[2] - prange[1]
   
   for exper=1,n do
