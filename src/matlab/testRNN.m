@@ -8,17 +8,20 @@ if ~exist('Pair_M','var')
 end
 
 N=8;
-rnnSize = 64;
-numLayers = 2;
+rnnSize = 32;
+numLayers = 1;
 solIndex = 1; % 1=integer, 2=distribution
 infIndex = 1; % 1=map, 2=marginal
 [gurModel, gurParams] = getGurobiModel(N);
 model_sign = sprintf('mt1_r%d_l%d_n%d_m%d_o2_s%d_i%d_valen',rnnSize, numLayers, N,N, solIndex, infIndex);
 model_name = 'trainHun';
-model_name = '0428Df-2';
+model_name = '0429Cl-1';
 mBst = 5;
 doRandomize = true;
 % doRandomize = false;
+
+allRes = {}; mInd = 0;
+
 
 runInfos.allAcc=zeros(1,nRuns);
 runInfos.gurAcc=zeros(1,nRuns);
@@ -70,6 +73,20 @@ for r = 1:nRuns
     gurResult = gurobi(gurModel, gurParams);
     runInfos.gurTime(r) = gurResult.runtime;    
     [gurMat, gurAss] = getOneHot(gurResult.x);
+    acc = matchAsg(gurMat, asgT);
+    obj = gurResult.x(:)' * newK * gurResult.x(:);
+%     fprintf('Gur Accuracy: %.2f\n\n',acc)
+    
+%     runInfos.gurAcc(r)=acc;
+%     runInfos.gurObj(r) = obj;    
+    %%% GUROBI
+    mInd=1;
+    allRes{mInd}.name = 'Branch-and-cut';
+    allRes{mInd}.cite = 'gurobi';
+    allRes{mInd}.acc(r) = acc;
+    allRes{mInd}.obj(r) = obj;
+    allRes{mInd}.time(r) = gurResult.runtime;
+    
 %     asgT.X = gurMat;
  
     
@@ -77,38 +94,70 @@ for r = 1:nRuns
 %         fprintf('Gurobi solution not one-to-one!\n')
     end
     
-    % marg
-    asgIpfpSMbst = mBestIPFP(newK,mBst,GTAss);
-    mbstVec = reshape(asgIpfpSMbst.Xmbst,N*N,1);
-    runInfos.mbstTime(r) = sum(asgIpfpSMbst.time);
-    runInfos.mbstObj(r) = mbstVec' * newK * mbstVec;
-    runInfos.mbstAcc(r) = matchAsg(asgIpfpSMbst.Xmbst', asgT);
+
     
-    thun = tic;
-    [matchHun, costHun] = hungarian(-asgIpfpSMbst.marginals);
-    thun=toc(thun);
-    hunVec = reshape(matchHun,N*N,1);
-    runInfos.mbstHATime(r) = runInfos.mbstTime(r) + thun;
-    runInfos.mbstHAObj(r) = hunVec' * newK * hunVec;
-    runInfos.mbstHAAcc(r) = matchAsg(matchHun', asgT);
     
-    % IPFP 'best'
+    % IPFP-S
     [pars, algs] = gmPar(2);
     
     Ct = ones(sqrt(size(newK,1)));    
     asgIpfpS = gm(newK, Ct, asgT, pars{6}{:});
-
     IPFPVec = reshape(asgIpfpS.X,N*N,1);
-    runInfos.IPFPTime(r) = asgIpfpS.tim;
-    runInfos.IPFPObj(r) = IPFPVec' * newK * IPFPVec;
-    runInfos.IPFPAcc(r) = matchAsg(asgIpfpS.X', asgT);
+
+    mInd=mInd+1;
+    allRes{mInd}.name = sprintf('IPFP-S');
+    allRes{mInd}.cite = 'Leordeanu:2012:IJCV';
+    allRes{mInd}.acc(r) = matchAsg(asgIpfpS.X', asgT);
+    allRes{mInd}.obj(r) = IPFPVec' * newK * IPFPVec;
+    allRes{mInd}.time(r) = asgIpfpS.tim;
+    
+    
+%     runInfos.IPFPTime(r) = asgIpfpS.tim;
+%     runInfos.IPFPObj(r) = IPFPVec' * newK * IPFPVec;
+%     runInfos.IPFPAcc(r) = matchAsg(asgIpfpS.X', asgT);
 
     % IPFP 'opt-out-of-m'
+    asgIpfpSMbst = mBestIPFP(newK,mBst,GTAss);
     [~,m] = max(asgIpfpSMbst.obj);
     moptVec = reshape(asgIpfpSMbst.X(:,:,m),N*N,1);
-    runInfos.moptTime(r) = sum(asgIpfpSMbst.time);
-    runInfos.moptObj(r) = moptVec' * newK * moptVec;
-    runInfos.moptAcc(r) = matchAsg(asgIpfpSMbst.X(:,:,m)', asgT);
+    
+    mInd=mInd+1;
+    allRes{mInd}.name = sprintf('IPFP-%dbstOpt',mBst);
+    allRes{mInd}.acc(r) = matchAsg(asgIpfpSMbst.X(:,:,m)', asgT);
+    allRes{mInd}.obj(r) = moptVec' * newK * moptVec;
+    allRes{mInd}.time(r) = sum(asgIpfpSMbst.time);
+    
+%     runInfos.moptTime(r) = sum(asgIpfpSMbst.time);
+%     runInfos.moptObj(r) = moptVec' * newK * moptVec;
+%     runInfos.moptAcc(r) = matchAsg(asgIpfpSMbst.X(:,:,m)', asgT);
+    
+    
+    % marginals    
+    mbstVec = reshape(asgIpfpSMbst.Xmbst,N*N,1);
+%     runInfos.mbstTime(r) = sum(asgIpfpSMbst.time);
+%     runInfos.mbstObj(r) = mbstVec' * newK * mbstVec;
+%     runInfos.mbstAcc(r) = matchAsg(asgIpfpSMbst.Xmbst', asgT);
+    
+    mInd=mInd+1;
+    allRes{mInd}.name = sprintf('IPFP-%dbstMar',mBst);
+    allRes{mInd}.cite = 'Rezatofighi:2016:CVPR';
+    allRes{mInd}.acc(r) = matchAsg(asgIpfpSMbst.Xmbst', asgT);
+    allRes{mInd}.obj(r) = mbstVec' * newK * mbstVec;
+    allRes{mInd}.time(r) = sum(asgIpfpSMbst.time);
+    
+    % marginals with Hungarian
+    thun = tic;
+    [matchHun, costHun] = hungarian(-asgIpfpSMbst.marginals);
+    thun=toc(thun);
+    hunVec = reshape(matchHun,N*N,1);
+%     runInfos.mbstHATime(r) = runInfos.mbstTime(r) + thun;
+%     runInfos.mbstHAObj(r) = hunVec' * newK * hunVec;
+%     runInfos.mbstHAAcc(r) = matchAsg(matchHun', asgT);
+    mInd=mInd+1;
+    allRes{mInd}.name = sprintf('IPFP-%dbstMarHA',mBst);
+    allRes{mInd}.acc(r) = matchAsg(matchHun', asgT);
+    allRes{mInd}.obj(r) = hunVec' * newK * hunVec;
+    allRes{mInd}.time(r) = allRes{mInd-1}.time(r) + thun;
     
     
     allQ=full(newK);
@@ -136,11 +185,19 @@ for r = 1:nRuns
 %         fprintf('RNN solution not one-to-one!\n')
     end
     
-    obj = resVec(:)' * newK * resVec(:);
-    acc = matchAsg(myResMat, asgT);
+%     obj = resVec(:)' * newK * resVec(:);
+%     acc = matchAsg(myResMat, asgT);
 %     fprintf('RNN Accuracy: %.2f\n',acc)        
-    runInfos.allAcc(r)=acc;
-    runInfos.allObj(r) = obj;
+%     runInfos.allAcc(r)=acc;
+%     runInfos.allObj(r) = obj;
+    
+    
+    mInd=mInd+1;
+    allRes{mInd}.name = 'LSTM';
+    allRes{mInd}.acc(r) = matchAsg(myResMat, asgT);
+    allRes{mInd}.obj(r) = resVec(:)' * newK * resVec(:);
+    allRes{mInd}.time(r) = resRaw(1,3);
+    
     
     % resolve with hungarian
     resObj = resRaw(:,2);
@@ -149,20 +206,21 @@ for r = 1:nRuns
     [matchHun, costHun] = hungarian(-resMat);
     thun=toc(thun);
     hunVec = reshape(matchHun',N*N,1);
-    runInfos.rnnHunTime(r) = runInfos.rnnTime(r) + thun;
-    runInfos.rnnHunObj(r) = hunVec' * newK * hunVec;
-    runInfos.rnnHunAcc(r) = matchAsg(matchHun, asgT);    
+%     runInfos.rnnHunTime(r) = runInfos.rnnTime(r) + thun;
+%     runInfos.rnnHunObj(r) = hunVec' * newK * hunVec;
+%     runInfos.rnnHunAcc(r) = matchAsg(matchHun, asgT);    
+    mInd=mInd+1;
+    allRes{mInd}.name = 'LSTM-HA';
+    allRes{mInd}.acc(r) = matchAsg(matchHun, asgT);  
+    allRes{mInd}.obj(r) = hunVec' * newK * hunVec;
+    allRes{mInd}.time(r) = resRaw(1,3)+thun;
+    
 %     pause
     catch err
         fprintf('WARNING. LSTM IGNORED. %s\n',err.message);
     end
     
-    acc = matchAsg(gurMat, asgT);
-    obj = gurResult.x(:)' * newK * gurResult.x(:);
-%     fprintf('Gur Accuracy: %.2f\n\n',acc)
-    
-    runInfos.gurAcc(r)=acc;
-    runInfos.gurObj(r) = obj;
+
 end
 
 % fprintf('Average RNN Accuracy: %.2f\n',mean(runInfos.allAcc))
@@ -172,12 +230,27 @@ end
 mbstMethod = sprintf('%d-bstMar',mBst);
 mbstHAMethod = sprintf('%d-bstMarH',mBst);
 moptMethod = sprintf('%d-opt',mBst);
-fprintf('\n%10s|%8s|%8s|%8s\n','Method','acc','obj','time');
+fprintf('\n%15s|%8s|%8s|%8s\n','Method','acc','obj','time');
 fprintf('-------------------------------------\n');
-fprintf('%10s|%8.2f|%8.2f|%8.3f\n','IPFP',mean(runInfos.IPFPAcc),mean(runInfos.IPFPObj),mean(runInfos.IPFPTime));
-fprintf('%10s|%8.2f|%8.2f|%8.3f\n','Gurobi',mean(runInfos.gurAcc),mean(runInfos.gurObj),mean(runInfos.gurTime));
-fprintf('%10s|%8.2f|%8.2f|%8.3f\n','LSTM',mean(runInfos.allAcc),mean(runInfos.allObj),mean(runInfos.rnnTime));
-fprintf('%10s|%8.2f|%8.2f|%8.3f\n','LSTM-HUN',mean(runInfos.rnnHunAcc),mean(runInfos.rnnHunObj),mean(runInfos.rnnHunTime));
-fprintf('%10s|%8.2f|%8.2f|%8.3f\n',mbstMethod,mean(runInfos.mbstAcc),mean(runInfos.mbstObj),mean(runInfos.mbstTime));
-fprintf('%10s|%8.2f|%8.2f|%8.3f\n',mbstHAMethod,mean(runInfos.mbstHAAcc),mean(runInfos.mbstHAObj),mean(runInfos.mbstHATime));
-fprintf('%10s|%8.2f|%8.2f|%8.3f\n',moptMethod,mean(runInfos.moptAcc),mean(runInfos.moptObj),mean(runInfos.moptTime));
+% fprintf('%10s|%8.2f|%8.2f|%8.3f\n','IPFP',mean(runInfos.IPFPAcc),mean(runInfos.IPFPObj),mean(runInfos.IPFPTime));
+% fprintf('%10s|%8.2f|%8.2f|%8.3f\n','Gurobi',mean(runInfos.gurAcc),mean(runInfos.gurObj),mean(runInfos.gurTime));
+% fprintf('%10s|%8.2f|%8.2f|%8.3f\n','LSTM',mean(runInfos.allAcc),mean(runInfos.allObj),mean(runInfos.rnnTime));
+% fprintf('%10s|%8.2f|%8.2f|%8.3f\n','LSTM-HUN',mean(runInfos.rnnHunAcc),mean(runInfos.rnnHunObj),mean(runInfos.rnnHunTime));
+% fprintf('%10s|%8.2f|%8.2f|%8.3f\n',mbstMethod,mean(runInfos.mbstAcc),mean(runInfos.mbstObj),mean(runInfos.mbstTime));
+% fprintf('%10s|%8.2f|%8.2f|%8.3f\n',mbstHAMethod,mean(runInfos.mbstHAAcc),mean(runInfos.mbstHAObj),mean(runInfos.mbstHATime));
+% fprintf('%10s|%8.2f|%8.2f|%8.3f\n',moptMethod,mean(runInfos.moptAcc),mean(runInfos.moptObj),mean(runInfos.moptTime));
+
+for mInd=1:length(allRes)
+    fprintf('%15s|%8.2f|%8.2f|%8.3f\n',allRes{mInd}.name,mean(allRes{mInd}.acc),mean(allRes{mInd}.obj),mean(allRes{mInd}.time));
+end
+
+%% export to latex
+fil = fopen(sprintf('../../../../papers/2016/anton-nips/numbers/matching-N%d.tex',N),'w');
+for mInd=1:length(allRes)
+    if strcmp(allRes{mInd}.name,'LSTM'), fprintf(fil, '\\midrule\n'); end
+    if isfield(allRes{mInd},'cite')
+        allRes{mInd}.name = sprintf('%s \\cite{%s}',allRes{mInd}.name,allRes{mInd}.cite);
+    end
+    fprintf(fil,'%25s & %8.2f & %8.2f & %8.3f\\\\\n',allRes{mInd}.name,mean(allRes{mInd}.acc),mean(allRes{mInd}.obj),mean(allRes{mInd}.time));
+end
+fclose(fil);

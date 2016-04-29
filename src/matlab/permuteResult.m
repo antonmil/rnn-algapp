@@ -10,7 +10,7 @@ M=N;
 n=0;
 takeEntry=zeros(1,N*M);
 for i=1:fullN
-    for j=newOrder
+    for j=newOrder % only permute second set
 %         [i,j]
         ii=sub2ind([fullN,fullM],i,j);
         n=n+1;

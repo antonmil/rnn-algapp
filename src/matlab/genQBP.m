@@ -1,4 +1,4 @@
-function genQBP(N, mb, nTr, mBst)
+function genQBP(N, mb, nTr, mBst, doMarginals)
 %% quadratic program data and solutions
 
 addpath(genpath('.'));
@@ -10,9 +10,11 @@ Pair_M = doMatching();
 if nargin<1, N=3; end
 if nargin<2, mb = 10; end % minibatch size
 if nargin<3, nTr = 10; end % training batches
-if nargin<4, mBst=5; end % training batches
+if nargin<4, mBst = 5; end % how many solutions
+if nargin<5, doMarginals = false; end
 
-doMarginals = mBst>0;
+% doMarginals = mBst>0;
+% doMarginals = false;
 if doMarginals, fprintf('Compute %d-best marginals\n',mBst); end
 takeRealData = true;
 
@@ -75,12 +77,20 @@ for ttm=ttmodes
     data.allSol = zeros(nSamples, N*M);
     data.allc = zeros(nSamples, N*M);
     data.allMarginals = zeros(nSamples, N*M);
+%     data.allProposals = zeros(nSamples, N*M);
     data.allSolInt = zeros(nSamples, N);
     data.allSolTimes = zeros(nSamples, 1);
     data.optres=false(nSamples,1);
     for m=1:mBst
-        allocStr = sprintf('data.all_%d_BestMarginals = zeros(nSamples, N*M);',m);
+        if doMarginals
+            allocStr = sprintf('data.all_%d_BestMarginals = zeros(nSamples, N*M);',m);
+            eval(allocStr);
+        end
+        allocStr = sprintf('data.all_%d_Proposals = zeros(nSamples, N*M);',m);
         eval(allocStr);
+        allocStr = sprintf('data.all_%d_ProposalsInt = zeros(nSamples, N);',m);
+        eval(allocStr);
+
     end
     
     n=0;
@@ -150,14 +160,14 @@ for ttm=ttmodes
             % pause
             
             % Mbest marginals?
-            tocMar = 0;
-            if doMarginals
-                tic;
-                [asgIpfpSMbst, allM] = mBestIPFP(Q,mBst);
-  
-                tocMar = toc;
+%             tocMar = 0;
+            tic;
+            if doMarginals                
+                [asgIpfpSMbst, allM] = mBestIPFP(Q,mBst);                  
+            else
+                [asgIpfpSMbst] = mBestIPFP(Q,mBst);  
             end
-            
+            tocMar = toc;
             
             result.x = binarize(result.x);
             if n<=1
@@ -170,7 +180,9 @@ for ttm=ttmodes
             %             result.x' * Q * result.x
             [Q, newRes, newOrder] = permuteResult(Q, result.x);
             result.x = newRes;
-            if doMarginals, [asgIpfpSMbst, allM] = mBestIPFP(Q,mBst); end
+            if doMarginals, [asgIpfpSMbst, allM] = mBestIPFP(Q,mBst); 
+            else [asgIpfpSMbst] = mBestIPFP(Q,mBst); 
+            end
             %             result.x' * Q * result.x
             %             pause
         end
@@ -197,7 +209,24 @@ for ttm=ttmodes
                 assignStr = sprintf('data.all_%d_BestMarginals(n,:) = reshape(allM{%d}'', 1, N*M);',m,m);
                 eval(assignStr);
             end                          
+        else            
+            for m=1:mBst
+                assignStr = sprintf('oneSol = reshape(asgIpfpSMbst.X(:,:,%d)'', 1, N*M)',m,m);
+                
+                assignStr = sprintf('data.all_%d_Proposals(n,:) = ;',m,m);
+                eval(assignStr);
+                
+                sol = projectToValidAssignment();
+                
+                assignStr = sprintf('sol = ; sol=hungarian(-sol); [~, solInt] = getOneHot(reshape(asgIpfpSMbst.X(:,:,%d)'', 1, N*M)',m);
+                eval(assignStr);
+%                  solInt
+                assignStr = sprintf('data.all_%d_ProposalsInt(n,:) = solInt;',m);
+                eval(assignStr);
+            end                          
         end
+        
+            
         [~,ass] = getOneHot(result.x);
         data.allSolInt(n,:) = ass;
         if strcmpi(result.status,'optimal')

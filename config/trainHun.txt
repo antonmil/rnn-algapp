@@ -6,9 +6,9 @@
             inference  map
              solution  integer
                sparse  0
-         invert_input  0
+         invert_input  1
          double_input  0
-           full_input  0
+           full_input  1
              exp_cost  1
            supervised  1
          grad_replace  1
@@ -24,7 +24,7 @@
                
             init_from  
         training_file  
-           max_epochs  50000
+           max_epochs  500000
       mini_batch_size  10
        synth_training  1000
           synth_valid  10
@@ -49,9 +49,9 @@
           dummy_noise  0
            train_type  0
           
-          print_every  100
-       eval_val_every  1000
-           plot_every  1000
+          print_every  1000
+       eval_val_every  10000
+           plot_every  10000
               dropout  0.1
              temp_win  4
            suppress_x  0
