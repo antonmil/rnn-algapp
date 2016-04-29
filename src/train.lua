@@ -478,6 +478,7 @@ function feval()
         end
       end
     elseif opt.solution == 'integer' then
+      mi = dataToGPU(mi)
       huns[takeSol:expand(opt.mini_batch_size, opt.max_n)] = mi:reshape(opt.mini_batch_size, opt.nClasses)
     end    
   end

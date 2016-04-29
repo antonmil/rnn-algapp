@@ -7,16 +7,16 @@ if ~exist('Pair_M','var')
     Pair_M=doMatching();
 end
 
-N=5;
-rnnSize = 32;
-numLayers = 1;
+N=8;
+rnnSize = 64;
+numLayers = 2;
 solIndex = 1; % 1=integer, 2=distribution
 infIndex = 1; % 1=map, 2=marginal
 [gurModel, gurParams] = getGurobiModel(N);
 model_sign = sprintf('mt1_r%d_l%d_n%d_m%d_o2_s%d_i%d_valen',rnnSize, numLayers, N,N, solIndex, infIndex);
 model_name = 'trainHun';
-% model_name = '0428Bg-4';
-mBst = 10;
+model_name = '0428Df-2';
+mBst = 5;
 doRandomize = true;
 % doRandomize = false;
 
@@ -50,31 +50,35 @@ for r = 1:nRuns
     fprintf('.');
 %     rng(321);
     RM = Pair_M{1,randi(length(Pair_M))};    
-    [newK,gurResult] = selectSubset(RM, N, true, gurModel, gurParams);
+    [newK,gurResult] = selectSubset(RM, N, false, gurModel, gurParams);    
 
-    runInfos.gurTime(r) = gurResult.runtime;
-    [gurMat, gurAss] = getOneHot(gurResult.x);
+%     runInfos.gurTime(r) = gurResult.runtime;
+%     [gurMat, gurAss] = getOneHot(gurResult.x);
 
     % randomize
-    newAss = 1:N;
+    GTAss = 1:N;
     if doRandomize
         canSol = eye(N);
         [newK, newSol, newOrder]=permuteResult(newK, canSol(:)');
-        [newSolMat, newAss] = getOneHot(newSol);
+        [newSolMat, GTAss] = getOneHot(newSol);
         asgT.X = eye(N);   
-        asgT.X = asgT.X(newAss',:);
-        gurModel.Q = newK;
-        gurResult = gurobi(gurModel, gurParams);
-        runInfos.gurTime(r) = gurResult.runtime;    
-        [gurMat, gurAss] = getOneHot(gurResult.x);
+        asgT.X = asgT.X(GTAss',:);
     end
+%     newK(~~newK) = rand;
+    
+    gurModel.Q = newK;
+    gurResult = gurobi(gurModel, gurParams);
+    runInfos.gurTime(r) = gurResult.runtime;    
+    [gurMat, gurAss] = getOneHot(gurResult.x);
+%     asgT.X = gurMat;
+ 
     
     if length(unique(gurAss)) ~= length(gurAss)
 %         fprintf('Gurobi solution not one-to-one!\n')
     end
     
     % marg
-    asgIpfpSMbst = mBestIPFP(newK,mBst,newAss);
+    asgIpfpSMbst = mBestIPFP(newK,mBst,GTAss);
     mbstVec = reshape(asgIpfpSMbst.Xmbst,N*N,1);
     runInfos.mbstTime(r) = sum(asgIpfpSMbst.time);
     runInfos.mbstObj(r) = mbstVec' * newK * mbstVec;
@@ -105,6 +109,14 @@ for r = 1:nRuns
     runInfos.moptTime(r) = sum(asgIpfpSMbst.time);
     runInfos.moptObj(r) = moptVec' * newK * moptVec;
     runInfos.moptAcc(r) = matchAsg(asgIpfpSMbst.X(:,:,m)', asgT);
+    
+    
+    allQ=full(newK);
+    gurResult.x = binarize(gurResult.x);
+    allSol = reshape(asgT.X', 1, N*N);
+    allSolInt = GTAss;
+    allMarginals = reshape(asgIpfpSMbst.marginals',1,N*N);
+    save(sprintf('%sdata/test_%d.mat',getRootDir,N),'allQ','allSol','allSolInt','allMarginals');   
     
     try
     cmd = sprintf('cd ..; pwd; th %s.lua -model_name %s -model_sign %s -suppress_x 1','test', model_name , model_sign);

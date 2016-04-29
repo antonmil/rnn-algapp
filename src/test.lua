@@ -19,6 +19,7 @@ cmd:text('Options')
 cmd:option('-model_name','trainHun','main model name')
 cmd:option('-model_sign','mt1_r100_l1_n3_m3_val','model signature')
 cmd:option('-suppress_x',0,'suppress plotting in terminal')
+cmd:option('-test_file','test','test file name')
 cmd:option('-seed',1,'Random seed')
 cmd:text()
 -- parse input params
@@ -45,7 +46,7 @@ opt = checkpoint.opt
 ------ Change some options for testing
 opt.mini_batch_size = 1
 opt.gpuid=-1
-opt.synth_training, opt.synth_valid = 2,10
+opt.synth_training, opt.synth_valid = 1,1
 opt.suppress_x = sopt.suppress_x
 
 init_state = getInitState(opt, miniBatchSize)
@@ -67,7 +68,7 @@ end
 
 ------ try real data
 if opt.problem == 'quadratic' then
-   local Qfile = string.format('%sdata/test_%d.mat',getRootDir(),opt.max_n);
+   local Qfile = string.format('%sdata/%s_%d.mat',getRootDir(),sopt.test_file,opt.max_n);
   checkFileExist(Qfile,'Q cost file')  
   local loaded = mattorch.load(Qfile)
   print('test file loaded... '..Qfile)
@@ -104,7 +105,7 @@ ValCostTab = prepData(ValCostTab)
 --  _,_,ValProbTab,ValSolTab = readQBPData('test')
 --end
 
-local nthSample=sopt.seed
+local nthSample = sopt.seed
 --nthSample = math.random(opt.synth_valid)
 --print(math.random(opt.synth_valid))
 --print(math.random(opt.synth_valid))
