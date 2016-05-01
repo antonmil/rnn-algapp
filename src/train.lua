@@ -53,6 +53,7 @@ cmd:option('-full_input',1,'Input full cost matrix (1), or row-by-row (0)')
 cmd:option('-supervised',1,'Supervised or unsupervised learning')
 cmd:option('-grad_replace',1,'Replace better predictions with 0 gradient')
 cmd:option('-diverse_solutions',1,'take an improved m-bst solution iteratively')
+cmd:option('-mbst',0,'how many diverse solutions to consider?')
 -- optimization
 cmd:option('-lrng_rate',1e-2,'learning rate')
 cmd:option('-lrng_rate_decay',0.99,'learning rate decay')
@@ -553,7 +554,7 @@ train_mm, val_mm, real_mm = {}, {}, {}
 train_ma, val_ma, real_ma = {}, {}, {}
 mot15_mota = {}
 mot15_mota_nopos = {}
-local mBstMar = 0
+local mProp = 0
 local optim_state = {learningRate = opt.lrng_rate, alpha = opt.decay_rate}
 local glTimer = torch.Timer()
 for i = 1, opt.max_epochs do
@@ -563,14 +564,17 @@ for i = 1, opt.max_epochs do
 --  if i>1 and (i-1)%opt.synth_training==0 and opt.random_epoch~=0 then
 
   -- replace GT  
-  if opt.inference == 'marginal' and opt.problem == 'quadratic' and opt.diverse_solutions ~= 0 then
+  if opt.problem == 'quadratic' and opt.diverse_solutions ~= 0 then
     if i == 1 or (i-1)%opt.synth_training == 0 then
-      mBstMar = mBstMar + 1
-      if mBstMar>10 then mBstMar = 1 end
+      mProp = mProp + 1
+      if mProp>opt.mbst then mProp = 1 end
 --      if opt.diverse_solutions == 0 then mBstMar = 10 end
-      pm('Replacing GT with '.. mBstMar .. '-best Marginals')
-      local mBstField = string.format('all_%d_BestMarginals',mBstMar)
-      for k,v in pairs(TrSolTab_m_BestMarginals[mBstMar]) do TrSolTab[k] = v end
+      pm('Replacing GT with '.. mProp .. '-best proposal')
+      
+--      print(TrSolTab[1])
+      for k,v in pairs(TrSolTab_m_Prop[mProp]) do TrSolTab[k] = v end
+--      print(TrSolTab[1])
+--      sleep(1)
   --    for k,v in pairs(TrSolTab_m_BestMarginals[mBst]) do TrSolTab[k] = v end
     end
   end

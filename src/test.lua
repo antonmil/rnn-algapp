@@ -56,7 +56,38 @@ pm('getting training/validation data...')
 if opt.problem == 'linear' then
     ValCostTab,ValSolTab = genHunData(opt.synth_valid)
 elseif opt.problem == 'quadratic' then
-  _,_,ValCostTab,ValSolTab = readQBPData('test')
+  local testfile = string.format('%sdata/%s_%d.mat',getRootDir(),sopt.test_file,opt.max_n);
+--  print(testfile)
+--  abort()
+  _,_,ValCostTab,ValSolTab = readQBPData('test', nil, testfile)
+------ try real data
+--if opt.problem == 'quadratic' then
+--  local Qfile = string.format('%sdata/%s_%d.mat',getRootDir(),sopt.test_file,opt.max_n);
+--  checkFileExist(Qfile,'Q cost file')  
+--  local loaded = mattorch.load(Qfile)
+--  print('test file loaded... '..Qfile)
+--
+--  local allQ = loaded.allQ:t() -- transpose because Matlab is first-dim-major (https://groups.google.com/forum/#!topic/torch7/qDIoWnJzkcU)
+--  allQ=allQ:float()
+--  local inSize = opt.inSize; if opt.double_input ~= 0 then inSize=inSize/2 end
+--  ValCostTab[1]=allQ:reshape(1,inSize)
+----  ValCostTab[1]=torch.rand(1,opt.inSize)
+--  if opt.inference == 'marginal' then 
+----    ValSolTab = computeMarginals(ValCostTab)
+----    print(loaded.allMarginals:t())
+----    abort()
+--    ValSolTab[1] = loaded.allMarginals:t()
+--  elseif opt.inference == 'map' then
+--    if opt.solution == 'integer' then
+----    ValSolTab[1] =torch.linspace(1,opt.max_n,opt.max_n):reshape(1,opt.max_n)
+----print(loaded)
+--      ValSolTab[1] = loaded.allSolInt:t()
+--    elseif opt.solution == 'distribution' then
+--      ValSolTab[1] = loaded.allSol:t()
+--    end
+--  end 
+--end
+
 end
 
 
@@ -66,33 +97,7 @@ end
 --  ValSolTab = computeMarginals(ValCostTab)
 --end
 
------- try real data
-if opt.problem == 'quadratic' then
-   local Qfile = string.format('%sdata/%s_%d.mat',getRootDir(),sopt.test_file,opt.max_n);
-  checkFileExist(Qfile,'Q cost file')  
-  local loaded = mattorch.load(Qfile)
-  print('test file loaded... '..Qfile)
 
-  local allQ = loaded.allQ:t() -- transpose because Matlab is first-dim-major (https://groups.google.com/forum/#!topic/torch7/qDIoWnJzkcU)
-  allQ=allQ:float()
-  local inSize = opt.inSize; if opt.double_input ~= 0 then inSize=inSize/2 end
-  ValCostTab[1]=allQ:reshape(1,inSize)
---  ValCostTab[1]=torch.rand(1,opt.inSize)
-  if opt.inference == 'marginal' then 
---    ValSolTab = computeMarginals(ValCostTab)
---    print(loaded.allMarginals:t())
---    abort()
-    ValSolTab[1] = loaded.allMarginals:t()
-  elseif opt.inference == 'map' then
-    if opt.solution == 'integer' then
---    ValSolTab[1] =torch.linspace(1,opt.max_n,opt.max_n):reshape(1,opt.max_n)
---print(loaded)
-      ValSolTab[1] = loaded.allSolInt:t()
-    elseif opt.solution == 'distribution' then
-      ValSolTab[1] = loaded.allSol:t()
-    end
-  end 
-end
 --print(ValCostTab[1]:view(opt.max_n,opt.max_m))
 ValCostTab = prepData(ValCostTab)
 --print(ValCostTab[1])

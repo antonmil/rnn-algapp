@@ -12,7 +12,8 @@
              exp_cost  1
            supervised  1
          grad_replace  1
-    diverse_solutions  0
+    diverse_solutions  1
+                 mbst  10
         project_valid  0
             state_dim  4
            batch_size  1
@@ -49,9 +50,9 @@
           dummy_noise  0
            train_type  0
           
-          print_every  1000
-       eval_val_every  10000
-           plot_every  10000
+          print_every  10
+       eval_val_every  100
+           plot_every  100
               dropout  0.1
              temp_win  4
            suppress_x  0

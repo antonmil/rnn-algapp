@@ -18,6 +18,11 @@ if nargin<5, doMarginals = false; end
 if doMarginals, fprintf('Compute %d-best marginals\n',mBst); end
 takeRealData = true;
 
+filebase = 'QBP-map';
+if doMarginals, filebase='QBP-marginal'; end
+filebase = sprintf('%s_m%d',filebase,mBst);
+
+            
 if takeRealData, fprintf('Taking real cost\n'); end
 
 dataMB = N^4 * mb * nTr * 8 / 1024 / 1024;
@@ -195,7 +200,7 @@ for ttm=ttmodes
         
         
         % insert in joint matrices
-        data.allQ(n,:) = Q(:)'; % WARNING. IS THIS CORRECT INDEXING FOR NON_SYMM MATRICES?
+        data.allQ(n,:) = Q(:)';
         data.allnnz(n,1) = nnz;
         data.allSparseQ(n,1:nnz*2) = torchSparse(:)';
         data.allc(n,:) = c;
@@ -208,19 +213,23 @@ for ttm=ttmodes
             for m=1:mBst
                 assignStr = sprintf('data.all_%d_BestMarginals(n,:) = reshape(allM{%d}'', 1, N*M);',m,m);
                 eval(assignStr);
-            end                          
+            end
         else            
             for m=1:mBst
-                assignStr = sprintf('oneSol = reshape(asgIpfpSMbst.X(:,:,%d)'', 1, N*M)',m,m);
+                assignStr = sprintf('oneSol = asgIpfpSMbst.X(:,:,%d);',m);
+                eval(assignStr);
+                % if not one-to-one, correct with hungarian
+                if ~all(sum(oneSol)==1) || ~all(sum(oneSol,2)==1)
+                    oneSol = projectToValidAssignment(-oneSol);
+                end
                 
-                assignStr = sprintf('data.all_%d_Proposals(n,:) = ;',m,m);
+                % fill binary vector solution
+                oneSolVec = reshape(oneSol'', 1, N*N);
+                assignStr = sprintf('data.all_%d_Proposals(n,:) = oneSolVec;',m);
                 eval(assignStr);
                 
-                sol = projectToValidAssignment();
-                
-                assignStr = sprintf('sol = ; sol=hungarian(-sol); [~, solInt] = getOneHot(reshape(asgIpfpSMbst.X(:,:,%d)'', 1, N*M)',m);
-                eval(assignStr);
-%                  solInt
+                % fill integer labels solution
+                [~, solInt] = getOneHot(oneSolVec, N, N);
                 assignStr = sprintf('data.all_%d_ProposalsInt(n,:) = solInt;',m);
                 eval(assignStr);
             end                          
@@ -239,7 +248,7 @@ for ttm=ttmodes
             %         HeatMap(Q);drawnow;
             
             % write results
-            writeQBP(ttmode, N, M, 'QBP', data, n, dv);
+            writeQBP(ttmode, N, M, filebase, data, n, dv);
         end
         
     end

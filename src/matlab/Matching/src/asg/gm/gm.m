@@ -50,6 +50,10 @@ XC = gmPosC(K, Ct, X0, parPosC);
 
 % continous -> discrete
 
+%%%
+% FLIP GT
+asgT.X = asgT.X';
+
 
 if strcmp(parPosD.alg,'ipfp_mbst')
     % make sure m <= N!

@@ -14,7 +14,7 @@ Ct = ones(n);
 asgT.X = eye(n);
 
 if nargin<3, assOrder = 1:n; end
-asgT.X = asgT.X(assOrder',:)';
+asgT.X = asgT.X(assOrder',:);
 
 %% algorithm parameter
 [pars, algs] = gmPar(2);
@@ -29,10 +29,11 @@ allMarginals{Mbst} = asgIpfpSMbst.marginals;
 if nargout>1
     for m=1:Mbst-1
         par_mb{1,3}.mbst=m;
-        asgIpfpSMbst = gm(K, Ct, asgT, par_mb{:});
-        allMarginals{m} = asgIpfpSMbst.marginals;
+        asgIpfpSMbstTMP = gm(K, Ct, asgT, par_mb{:});
+        allMarginals{m} = asgIpfpSMbstTMP.marginals;
     end
 end
+
 % tm(11) = toc(tIpfp);    
 % acc(11) = asgIpfpSMbst.acc;
 % obj(11) = 0;

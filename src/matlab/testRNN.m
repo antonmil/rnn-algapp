@@ -7,7 +7,7 @@ if ~exist('Pair_M','var')
     Pair_M=doMatching();
 end
 
-N=8;
+N=5;
 rnnSize = 32;
 numLayers = 1;
 solIndex = 1; % 1=integer, 2=distribution
@@ -15,7 +15,7 @@ infIndex = 1; % 1=map, 2=marginal
 [gurModel, gurParams] = getGurobiModel(N);
 model_sign = sprintf('mt1_r%d_l%d_n%d_m%d_o2_s%d_i%d_valen',rnnSize, numLayers, N,N, solIndex, infIndex);
 model_name = 'trainHun';
-model_name = '0429Cl-1';
+% model_name = '0429Cl-1';
 mBst = 5;
 doRandomize = true;
 % doRandomize = false;
@@ -23,35 +23,11 @@ doRandomize = true;
 allRes = {}; mInd = 0;
 
 
-runInfos.allAcc=zeros(1,nRuns);
-runInfos.gurAcc=zeros(1,nRuns);
-runInfos.mbstAcc=zeros(1,nRuns);
-runInfos.mbstHAAcc=zeros(1,nRuns);
-runInfos.IPFPAcc=zeros(1,nRuns);
-runInfos.moptAcc=zeros(1,nRuns);
-runInfos.rnnHunAcc=zeros(1,nRuns);
-
-runInfos.allObj=zeros(1,nRuns);
-runInfos.gurObj=zeros(1,nRuns);
-runInfos.mbstObj=zeros(1,nRuns);
-runInfos.mbstHAObj=zeros(1,nRuns);
-runInfos.IPFPObj=zeros(1,nRuns);
-runInfos.moptObj=zeros(1,nRuns);
-runInfos.rnnHunObj=zeros(1,nRuns);
-
-runInfos.rnnTime=zeros(1,nRuns);
-runInfos.gurTime=zeros(1,nRuns);
-runInfos.mbstTime=zeros(1,nRuns);
-runInfos.mbstHAObj=zeros(1,nRuns);
-runInfos.IPFPTime=zeros(1,nRuns);
-runInfos.moptTime=zeros(1,nRuns);
-runInfos.rnnHunTime=zeros(1,nRuns);
-
 asgT.X=eye(N);
 
 for r = 1:nRuns
     fprintf('.');
-%     rng(321);
+%     rng(3211211);
     RM = Pair_M{1,randi(length(Pair_M))};    
     [newK,gurResult] = selectSubset(RM, N, false, gurModel, gurParams);    
 
@@ -66,6 +42,7 @@ for r = 1:nRuns
         [newSolMat, GTAss] = getOneHot(newSol);
         asgT.X = eye(N);   
         asgT.X = asgT.X(GTAss',:);
+%         asgT.X = asgT.X(:,GTAss);
     end
 %     newK(~~newK) = rand;
     
@@ -160,15 +137,18 @@ for r = 1:nRuns
     allRes{mInd}.time(r) = allRes{mInd-1}.time(r) + thun;
     
     
-    allQ=full(newK);
+    allQ=full(newK); allQ=allQ(:)';
     gurResult.x = binarize(gurResult.x);
     allSol = reshape(asgT.X', 1, N*N);
     allSolInt = GTAss;
     allMarginals = reshape(asgIpfpSMbst.marginals',1,N*N);
-    save(sprintf('%sdata/test_%d.mat',getRootDir,N),'allQ','allSol','allSolInt','allMarginals');   
+    testfilebase='test';
+    testfile = sprintf('%sdata/%s_%d.mat',getRootDir,testfilebase,N);
+    save(testfile,'allQ','allSol','allSolInt','allMarginals');   
     
     try
-    cmd = sprintf('cd ..; pwd; th %s.lua -model_name %s -model_sign %s -suppress_x 1','test', model_name , model_sign);
+    cmd = sprintf('cd ..; pwd; th %s.lua -model_name %s -model_sign %s -suppress_x 1 -test_file %s','test', ...
+        model_name , model_sign, testfilebase);
     [a,b] = system(cmd);    
     if a~=0
 %         fprintf('Error running RNN!\n'); b
@@ -245,12 +225,15 @@ for mInd=1:length(allRes)
 end
 
 %% export to latex
-fil = fopen(sprintf('../../../../papers/2016/anton-nips/numbers/matching-N%d.tex',N),'w');
-for mInd=1:length(allRes)
-    if strcmp(allRes{mInd}.name,'LSTM'), fprintf(fil, '\\midrule\n'); end
-    if isfield(allRes{mInd},'cite')
-        allRes{mInd}.name = sprintf('%s \\cite{%s}',allRes{mInd}.name,allRes{mInd}.cite);
+doExport=false;
+if doExport
+    fil = fopen(sprintf('../../../../papers/2016/anton-nips/numbers/matching-N%d.tex',N),'w');
+    for mInd=1:length(allRes)
+        if strcmp(allRes{mInd}.name,'LSTM'), fprintf(fil, '\\midrule\n'); end
+        if isfield(allRes{mInd},'cite')
+            allRes{mInd}.name = sprintf('%s \\cite{%s}',allRes{mInd}.name,allRes{mInd}.cite);
+        end
+        fprintf(fil,'%25s & %8.2f & %8.2f & %8.3f\\\\\n',allRes{mInd}.name,mean(allRes{mInd}.acc),mean(allRes{mInd}.obj),mean(allRes{mInd}.time));
     end
-    fprintf(fil,'%25s & %8.2f & %8.2f & %8.3f\\\\\n',allRes{mInd}.name,mean(allRes{mInd}.acc),mean(allRes{mInd}.obj),mean(allRes{mInd}.time));
+    fclose(fil);
 end
-fclose(fil);
