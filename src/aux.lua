@@ -1245,13 +1245,14 @@ function plotProgress(predictions,winID, winTitle)
   if opt.inference ~= 'marginal' then sol=getOneHotLab(sol, true) end
   --  end
   -- plot prob distributions
-  local plotTab = {}
-  gnuplot.raw('unset ytics')
-  plotTab = getPredPlotTab(plotTab, predDA, 1)
-  plotTab = getPredPlotTab(plotTab, sol, 2)
-  plot(plotTab, winID, winTitle)
-  gnuplot.raw('set ytics')
-
+  if winTitle ~= '' then
+    local plotTab = {}
+    gnuplot.raw('unset ytics')
+    plotTab = getPredPlotTab(plotTab, predDA, 1)
+    plotTab = getPredPlotTab(plotTab, sol, 2)
+    plot(plotTab, winID, winTitle)
+    gnuplot.raw('set ytics')
+  end
 
   return mm
 end
@@ -1303,13 +1304,17 @@ function plotProgressD(predictions,winID, winTitle)
   --  print(sol)
   sol=getOneHotLab(sol, true, opt.max_m)
   -- plot prob distributions
-  local plotTab = {}
-  gnuplot.raw('unset ytics')
-  plotTab = getPredPlotTab(plotTab, predDA, 1)
-  --  print(sol)
-  plotTab = getPredPlotTab(plotTab, sol, 2)
-  plot(plotTab, winID, winTitle)
-  gnuplot.raw('set ytics')
+  
+--  print(winTitle)
+  if winTitle ~= '' then
+    local plotTab = {}
+    gnuplot.raw('unset ytics')
+    plotTab = getPredPlotTab(plotTab, predDA, 1)
+    --  print(sol)
+    plotTab = getPredPlotTab(plotTab, sol, 2)
+    plot(plotTab, winID, winTitle)
+    gnuplot.raw('set ytics')
+  end
 
 
   return mm

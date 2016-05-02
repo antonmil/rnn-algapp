@@ -25,6 +25,13 @@ par_mb{1,3}.chck_sols=param.chck_sols;
 % tIpfp = tic;
 asgIpfpSMbst = gm(K, Ct, asgT, par_mb{:});
 
+% [model, params] = getGurobiModel(n);
+% c = ones(1,n*n);
+% model.Q = K; c(:)=0; % quadratic weights (c=const means no unaries)
+% model.obj = c;
+% result = gurobi(model, params); % run gurobi
+% 
+
 allMarginals{Mbst} = asgIpfpSMbst.marginals;
 if nargout>1
     for m=1:Mbst-1

@@ -347,6 +347,7 @@ function eval_val()
     if seq==plotSeq then
       print('Validation checkpoint')
 --      eval_val_mm = plotProgress(predictions,3,'Validation')
+      eval_val_mm = plotProgress(predictions,3,'')
     end
 
     --         eval_val_mm = 0
@@ -494,6 +495,7 @@ function feval()
   if (globiter == 1) or (globiter % opt.plot_every == 0) then
     print('Training checkpoint')
 --    print(predictions)
+    feval_mm = plotProgress(predictions,1,'')
 --    feval_mm = plotProgress(predictions,1,'Train')
     --    feval_mm = getDAErrorHUN(predDA:reshape(opt.max_n,1,opt.nClasses), hun:reshape(opt.max_n,1))
 --    if globiter>1 then abort() end

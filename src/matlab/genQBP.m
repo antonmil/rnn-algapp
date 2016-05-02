@@ -13,6 +13,10 @@ if nargin<3, nTr = 10; end % training batches
 if nargin<4, mBst = 5; end % how many solutions
 if nargin<5, doMarginals = false; end
 
+if factorial(N)<mBst
+    mBst=factorial(N);
+    fprintf('Reducing mBest to %d\n',mBst);
+end
 % doMarginals = mBst>0;
 % doMarginals = false;
 if doMarginals, fprintf('Compute %d-best marginals\n',mBst); end
