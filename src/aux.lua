@@ -11,6 +11,20 @@ function fixOpt(opt)
 
   opt.max_m = opt.max_n
   opt.model = string.lower(opt.model) -- make model name lower case
+  
+  -- convert integer indexes to string descriptions 
+  if opt.order == 1 then opt.problem = 'linear' 
+  elseif opt.order == 2 then opt.problem ='quadratic'
+  end
+
+  if opt.inf_index == 1 then opt.inference = 'map'
+  elseif opt.inf_index == 2 then opt.inference = 'marginal'
+  end
+    
+  if opt.sol_index == 1 then opt.solution = 'integer'
+  elseif opt.sol_index == 2 then opt.solution = 'distribution'
+  end
+
   opt.inference = string.lower(opt.inference)
   if string.find(opt.inference,'marg')~=nil then opt.inference='marginal' end
 
@@ -56,17 +70,17 @@ function fixOpt(opt)
   end
 
   -- setting as integers
-  if opt.problem == 'linear' then opt.order = 1
-  elseif opt.problem=='quadratic' then opt.order = 2
-  end
-
-  if opt.solution == 'integer' then opt.sol_index = 1
-  elseif opt.solution == 'distribution' then opt.sol_index = 2
-  end
-
-  if opt.inference == 'map' then opt.inf_index = 1
-  elseif opt.inference == 'marginal' then opt.inf_index = 2
-  end
+--  if opt.problem == 'linear' then opt.order = 1
+--  elseif opt.problem=='quadratic' then opt.order = 2
+--  end
+--
+--  if opt.solution == 'integer' then opt.sol_index = 1
+--  elseif opt.solution == 'distribution' then opt.sol_index = 2
+--  end
+--
+--  if opt.inference == 'map' then opt.inf_index = 1
+--  elseif opt.inference == 'marginal' then opt.inf_index = 2
+--  end
 
 
   return opt

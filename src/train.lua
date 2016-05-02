@@ -43,9 +43,12 @@ cmd:option('-num_layers',1,'number of layers in the RNN / LSTM')
 cmd:option('-max_n',2,'number of rows')
 cmd:option('-max_m',2,'number of columns')
 cmd:option('-lambda',1,'loss weighting')
-cmd:option('-problem','quadratic','[linear|quadratic]')
-cmd:option('-inference','map','[map|marginal]')
-cmd:option('-solution','integer','[integer|distribution]')
+--cmd:option('-problem','quadratic','[linear|quadratic]')
+--cmd:option('-inference','map','[map|marginal]')
+--cmd:option('-solution','integer','[integer|distribution]')
+cmd:option('-order',2,'linear (1) or quadratic (2)')
+cmd:option('-inf_index',2,'map (1) or marginal (2)')
+cmd:option('-sol_index',1,'integer (1) or distribution (2)')
 cmd:option('-sparse',0,'are the features passed as a sparse matrix?')
 cmd:option('-invert_input',0,'Invert input? (Sutskever et al., 2014)')
 cmd:option('-double_input',0,'Double input? (Zaremba and Sutskever, 2014)')
@@ -343,7 +346,7 @@ function eval_val()
 
     if seq==plotSeq then
       print('Validation checkpoint')
-      eval_val_mm = plotProgress(predictions,3,'Validation')
+--      eval_val_mm = plotProgress(predictions,3,'Validation')
     end
 
     --         eval_val_mm = 0
@@ -445,6 +448,7 @@ function feval()
   local solv, takeSol = torch.max(energies, 3)
   takeSol=takeSol:reshape(opt.mini_batch_size, 1):eq(2) -- keep prediction?
 --  print(torch.sum(takeSol)/opt.mini_batch_size*100 .. '% of GT replaced by prediction')
+  percReplaced = torch.sum(takeSol)/opt.mini_batch_size
 
   -- PROJECT FOR PLOTTING
   local projSol = zeroTensor3(opt.mini_batch_size, opt.max_n * opt.max_m,1)
@@ -490,7 +494,7 @@ function feval()
   if (globiter == 1) or (globiter % opt.plot_every == 0) then
     print('Training checkpoint')
 --    print(predictions)
-    feval_mm = plotProgress(predictions,1,'Train')
+--    feval_mm = plotProgress(predictions,1,'Train')
     --    feval_mm = getDAErrorHUN(predDA:reshape(opt.max_n,1,opt.nClasses), hun:reshape(opt.max_n,1))
 --    if globiter>1 then abort() end
   end
@@ -547,6 +551,7 @@ end
 
 train_energies, val_energies, gt_energies = {}, {}, {}
 train_energies_proj, val_energies_proj, gt_energies_proj = {}, {}, {}
+gt_replaced = {}
 train_losses = {}
 val_losses = {}
 real_losses = {}
@@ -569,7 +574,7 @@ for i = 1, opt.max_epochs do
       mProp = mProp + 1
       if mProp>opt.mbst then mProp = 1 end
 --      if opt.diverse_solutions == 0 then mBstMar = 10 end
-      pm('Replacing GT with '.. mProp .. '-best proposal')
+      pm('Replacing GT with '.. mProp .. '-th proposal')
       
 --      print(TrSolTab[1])
       for k,v in pairs(TrSolTab_m_Prop[mProp]) do TrSolTab[k] = v end
@@ -589,7 +594,7 @@ for i = 1, opt.max_epochs do
   gt_energies[i] = GTMeanEnergy
   train_energies_proj[i] = predMeanEnergyProj
   gt_energies_proj[i] = GTMeanEnergyProj
-  
+  gt_replaced[i] = percReplaced
 
   -- exponential learning rate decay
   if i % (torch.round(opt.max_epochs/10)) == 0 and opt.lrng_rate_decay < 1 then
@@ -626,12 +631,13 @@ for i = 1, opt.max_epochs do
     val_energies_proj[i] = val_energy_proj
     
 
-    train_mm[i] = feval_mm+1
-    val_mm[i] = eval_val_mm+1
-    real_mm[i] = eval_benchmark_mm+1
+    local mmoffset = 0
+    train_mm[i] = feval_mm+mmoffset
+    val_mm[i] = eval_val_mm+mmoffset
+    real_mm[i] = eval_benchmark_mm+mmoffset
 
-    train_ma[i] = feval_multass+1
-    val_ma[i] = eval_val_multass+1
+    train_ma[i] = feval_multass+mmoffset
+    val_ma[i] = eval_val_multass+mmoffset
 
     local plot_loss_x, plot_loss = getLossPlot(i, opt.eval_val_every, train_losses)
     local plot_val_loss_x, plot_val_loss = getValLossPlot(val_losses)
@@ -662,6 +668,7 @@ for i = 1, opt.max_epochs do
     local maxTrainEnergyProj, maxTrainEnergyItProj = maxValAndIt(plot_energies_proj)
     local maxValidEnergyProj, maxValidEnergyItProj = maxValAndIt(plot_val_energies_proj)
 
+    local _, plot_gt_replaced = getLossPlot(i, opt.eval_val_every, gt_replaced)
 
     pm('--------------------------------------------------------')
     pm(string.format('%10s%10s%10s%10s%10s%10s','Obj (max)','Training','Valid','GT','Tr-Prj','Val-Prj'))
@@ -692,8 +699,8 @@ for i = 1, opt.max_epochs do
     -- first try generating new data
 --    if ((i - minValidLossIt) > 2*opt.eval_val_every) and ((i - minValidLossIt) <= 6*opt.eval_val_every) and opt.random_epoch~=0 then
 --      if opt.problem == 'quadratic' then
---        -- call matlab to generate new data
---        local cmdstr = string.format('sh genData.sh %d %d %d',opt.max_n, opt.mini_batch_size, opt.synth_training) 
+--        -- call matlab to generate new data (1) size, 2) mbatch size, 3) #mini batches, 4) #proposals, 5) doMarginals?)
+--        local cmdstr = string.format('sh genData.sh %d %d %d %d %d',opt.max_n, opt.mini_batch_size, opt.synth_training, opt.mbst, opt.inf_index-1) 
 --        os.execute(cmdstr) 
 --      end
 --      getData(opt, true, false)
@@ -723,7 +730,7 @@ for i = 1, opt.max_epochs do
 
     pm('--------------------------------------------------------')
     pm(string.format('%10s%10s%10s%10s','MissDA','Training','Valid','Real'))
-    pm(string.format('%10s%10.2f%10.2f%10.2f','Current',feval_mm+1,eval_val_mm+1,eval_benchmark_mm+1))
+    pm(string.format('%10s%10.2f%10.2f%10.2f','Current',feval_mm+mmoffset,eval_val_mm+mmoffset,eval_benchmark_mm+1))
     pm(string.format('%10s%10.2f%10.2f%10.2f','Best',minTrainLoss,  minValidLoss, minRealLoss))
     pm(string.format('%10s%10d%10d%10d','Iter',minTrainLossIt,  minValidLossIt, minRealLossIt))
     pm('--------------------------------------------------------')
@@ -755,8 +762,8 @@ for i = 1, opt.max_epochs do
     table.insert(lossPlotTab, {"Trng loss",plot_loss_x,plot_loss, 'with linespoints lt 1'})
     table.insert(lossPlotTab, {"Vald loss",plot_val_loss_x, plot_val_loss, 'with linespoints lt 3'})
     --       table.insert(lossPlotTab, {"Real loss",plot_real_loss_x, plot_real_loss, 'linespoints lt 5'})
-    table.insert(lossPlotTab, {"Trng MM",plot_train_mm_x, plot_train_mm+.1, 'with points lt 1'})
-    table.insert(lossPlotTab, {"Vald MM",plot_val_mm_x, plot_val_mm-.1, 'with points lt 3'})
+    table.insert(lossPlotTab, {"Trng MM",plot_train_mm_x, plot_train_mm+.05, 'with points lt 1'})
+    table.insert(lossPlotTab, {"Vald MM",plot_val_mm_x, plot_val_mm-.05, 'with points lt 3'})
     --       table.insert(lossPlotTab, {"Real MM",plot_real_mm_x, plot_real_mm, 'points lt 5'})
 
     --       table.insert(lossPlotTab, {"Trng MA",plot_train_ma_x, plot_train_ma, 'points pt 1'})
@@ -765,15 +772,17 @@ for i = 1, opt.max_epochs do
     table.insert(lossPlotTab, {"Trng O-proj",plot_loss_x,plot_energies_proj/en_norm, 'with linespoints lt 7'})
     table.insert(lossPlotTab, {"Vald O-proj",plot_val_loss_x, plot_val_energies_proj/en_norm, 'with linespoints lt 8'})
     
+    table.insert(lossPlotTab, {"% better pred",plot_loss_x, plot_gt_replaced, 'with lines lt 9'})
+    
     --  local minInd = math.min(1,plot_loss:nElement())
-    local maxY = math.max(torch.max(plot_loss), torch.max(plot_val_loss), torch.max(plot_real_loss),
-      torch.max(plot_train_mm), torch.max(plot_val_mm), torch.max(plot_real_mm))*2
-    local minY = math.min(torch.min(plot_loss), torch.min(plot_val_loss), torch.min(plot_real_loss),
-      torch.min(plot_train_mm), torch.min(plot_val_mm), torch.min(plot_real_mm))/2
-      
+--    local maxY = math.max(torch.max(plot_loss), torch.max(plot_val_loss), torch.max(plot_real_loss),
+--      torch.max(plot_train_mm), torch.max(plot_val_mm), torch.max(plot_real_mm))*2
+--    local minY = math.min(torch.min(plot_loss), torch.min(plot_val_loss), torch.min(plot_real_loss),
+--      torch.min(plot_train_mm), torch.min(plot_val_mm), torch.min(plot_real_mm))/2
+--      
     
     local minY, maxY = minMax(plot_train_mm, plot_val_mm, plot_energies_proj/en_norm, plot_val_energies_proj/en_norm,
-          plot_loss, plot_val_loss)
+          plot_loss, plot_val_loss, plot_gt_replaced)
     
 --    minY = math.max(0.001, minY/2)
 --    maxY=maxY*2

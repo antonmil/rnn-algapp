@@ -1,17 +1,17 @@
           model_index  1
              rnn_size  32
            num_layers  1
-                max_n  5
-              problem  quadratic
-            inference  map
-             solution  integer
+                max_n  4
+                order  2
+            inf_index  2
+            sol_index  2
                sparse  0
          invert_input  1
          double_input  0
            full_input  1
              exp_cost  1
            supervised  1
-         grad_replace  1
+         grad_replace  0
     diverse_solutions  1
                  mbst  10
         project_valid  0
@@ -50,9 +50,9 @@
           dummy_noise  0
            train_type  0
           
-          print_every  10
-       eval_val_every  100
-           plot_every  100
+          print_every  100
+       eval_val_every  1000
+           plot_every  1000
               dropout  0.1
              temp_win  4
            suppress_x  0

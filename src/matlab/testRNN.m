@@ -7,16 +7,16 @@ if ~exist('Pair_M','var')
     Pair_M=doMatching();
 end
 
-N=5;
-rnnSize = 32;
-numLayers = 1;
+N=8;
+rnnSize = 96;
+numLayers = 2;
 solIndex = 1; % 1=integer, 2=distribution
 infIndex = 1; % 1=map, 2=marginal
 [gurModel, gurParams] = getGurobiModel(N);
 model_sign = sprintf('mt1_r%d_l%d_n%d_m%d_o2_s%d_i%d_valen',rnnSize, numLayers, N,N, solIndex, infIndex);
 model_name = 'trainHun';
-% model_name = '0429Cl-1';
-mBst = 5;
+model_name = '0501Es-2';
+mBst = 10;
 doRandomize = true;
 % doRandomize = false;
 

@@ -12,4 +12,4 @@ nngraph_*
 *.dot
 *.svg
 src/matlab/Matching/Cars_*
-
+src/matlab/parsearch/*
