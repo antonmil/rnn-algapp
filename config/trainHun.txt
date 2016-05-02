@@ -1,12 +1,12 @@
           model_index  1
-             rnn_size  32
+             rnn_size  16
            num_layers  1
-                max_n  4
-                order  1
-            inf_index  2
-            sol_index  2
+                max_n  8
+                order  2
+            inf_index  1
+            sol_index  1
                sparse  0
-         invert_input  1
+         invert_input  0
          double_input  0
            full_input  1
              exp_cost  1

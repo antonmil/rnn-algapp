@@ -761,8 +761,8 @@ for i = 1, opt.max_epochs do
     local en_norm = 1 --opt.mu
     local lossPlotTab = {}
     
-    table.insert(lossPlotTab, {"Trng loss",plot_loss_x,plot_loss, 'with linespoints lt 1'})
-    table.insert(lossPlotTab, {"Vald loss",plot_val_loss_x, plot_val_loss, 'with linespoints lt 3'})
+--    table.insert(lossPlotTab, {"Trng loss",plot_loss_x,plot_loss, 'with linespoints lt 1'})
+--    table.insert(lossPlotTab, {"Vald loss",plot_val_loss_x, plot_val_loss, 'with linespoints lt 3'})
     --       table.insert(lossPlotTab, {"Real loss",plot_real_loss_x, plot_real_loss, 'linespoints lt 5'})
     table.insert(lossPlotTab, {"Trng MM",plot_train_mm_x, plot_train_mm+.05, 'with points lt 1'})
     table.insert(lossPlotTab, {"Vald MM",plot_val_mm_x, plot_val_mm-.05, 'with points lt 3'})
@@ -783,8 +783,8 @@ for i = 1, opt.max_epochs do
 --      torch.min(plot_train_mm), torch.min(plot_val_mm), torch.min(plot_real_mm))/2
 --      
     
-    local minY, maxY = minMax(plot_train_mm, plot_val_mm, plot_energies_proj/en_norm, plot_val_energies_proj/en_norm,
-          plot_loss, plot_val_loss, plot_gt_replaced)
+    local minY, maxY = minMax(plot_train_mm, plot_val_mm, 
+      plot_energies_proj/en_norm, plot_val_energies_proj/en_norm,  plot_gt_replaced)
     
 --    minY = math.max(0.001, minY/2)
 --    maxY=maxY*2
