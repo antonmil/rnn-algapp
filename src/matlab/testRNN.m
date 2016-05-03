@@ -7,15 +7,16 @@ if ~exist('Pair_M','var')
     Pair_M=doMatching('Motor');
 end
 
-N=6;
-rnnSize = 16;
-numLayers = 1;
+N=8;
+rnnSize = 64;
+numLayers = 2;
 solIndex = 1; % 1=integer, 2=distribution
 infIndex = 1; % 1=map, 2=marginal
 [gurModel, gurParams] = getGurobiModel(N);
 model_sign = sprintf('mt1_r%d_l%d_n%d_m%d_o2_s%d_i%d_valen',rnnSize, numLayers, N,N, solIndex, infIndex);
 model_name = 'trainHun';
-% model_name = '0502An-5';
+model_name = '0502Fs-1'; % GOOD ONE (also 0502Fs-1)
+model_name = '0502Fs-1'; %
 mBst = 10;
 doRandomize = true;
 % doRandomize = false;

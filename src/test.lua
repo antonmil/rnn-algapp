@@ -59,7 +59,7 @@ elseif opt.problem == 'quadratic' then
   local testfile = string.format('%sdata/%s_%d.mat',getRootDir(),sopt.test_file,opt.max_n);
 --  print(testfile)
 --  abort()
-  _,_,ValCostTab,ValSolTab = readQBPData('test', nil, testfile)
+  _,_,ValCostTab,ValSolTab = readQBPData('test', testfile)
 ------ try real data
 --if opt.problem == 'quadratic' then
 --  local Qfile = string.format('%sdata/%s_%d.mat',getRootDir(),sopt.test_file,opt.max_n);

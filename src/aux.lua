@@ -1263,7 +1263,7 @@ function plotProgress(predictions,winID, winTitle)
     gnuplot.raw('unset ytics')
     plotTab = getPredPlotTab(plotTab, predDA, 1)
     plotTab = getPredPlotTab(plotTab, sol, 2)
-    plot(plotTab, winID, winTitle)
+    plot(plotTab, winID, winTitle, {}, 1)
     gnuplot.raw('set ytics')
   end
 

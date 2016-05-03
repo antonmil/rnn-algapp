@@ -1,5 +1,5 @@
           model_index  1
-             rnn_size  16
+             rnn_size  128
            num_layers  1
                 max_n  5
                 order  1
@@ -11,9 +11,9 @@
            full_input  1
              exp_cost  1
            supervised  1
-         grad_replace  1
-    diverse_solutions  1
-                 mbst  2
+         grad_replace  0
+    diverse_solutions  0
+                 mbst  1
         project_valid  0
             state_dim  4
            batch_size  1
@@ -27,7 +27,7 @@
         training_file  
            max_epochs  500000
       mini_batch_size  10
-       synth_training  500
+       synth_training  1000
           synth_valid  10
              full_set  0
 
@@ -44,7 +44,7 @@
        reshuffle_dets  1
            order_dets  0
          use_gt_input  1
-         random_epoch  10
+         random_epoch  0
        freq_reshuffle  0
               permute  0
           dummy_noise  0

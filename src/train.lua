@@ -346,8 +346,8 @@ function eval_val()
 
     if seq==plotSeq then
       print('Validation checkpoint')
---      eval_val_mm = plotProgress(predictions,3,'Validation')
-      eval_val_mm = plotProgress(predictions,3,'')
+      eval_val_mm = plotProgress(predictions,3,'Validation')
+--      eval_val_mm = plotProgress(predictions,3,'')
     end
 
     --         eval_val_mm = 0
@@ -495,8 +495,8 @@ function feval()
   if (globiter == 1) or (globiter % opt.plot_every == 0) then
     print('Training checkpoint')
 --    print(predictions)
-    feval_mm = plotProgress(predictions,1,'')
---    feval_mm = plotProgress(predictions,1,'Train')
+--    feval_mm = plotProgress(predictions,1,'')
+    feval_mm = plotProgress(predictions,1,'Train')
     --    feval_mm = getDAErrorHUN(predDA:reshape(opt.max_n,1,opt.nClasses), hun:reshape(opt.max_n,1))
 --    if globiter>1 then abort() end
   end
@@ -772,8 +772,6 @@ for i = 1, opt.max_epochs do
     local en_norm = 1 --opt.mu
     local lossPlotTab = {}
     
---    table.insert(lossPlotTab, {"Trng loss",plot_loss_x,plot_loss, 'with linespoints lt 1'})
---    table.insert(lossPlotTab, {"Vald loss",plot_val_loss_x, plot_val_loss, 'with linespoints lt 3'})
     --       table.insert(lossPlotTab, {"Real loss",plot_real_loss_x, plot_real_loss, 'linespoints lt 5'})
     table.insert(lossPlotTab, {"Trng MM",plot_train_mm_x, plot_train_mm+.05, 'with points lt 1'})
     table.insert(lossPlotTab, {"Vald MM",plot_val_mm_x, plot_val_mm-.05, 'with points lt 3'})
@@ -796,7 +794,14 @@ for i = 1, opt.max_epochs do
     
     local minY, maxY = minMax(plot_train_mm, plot_val_mm, 
       plot_energies_proj/en_norm, plot_val_energies_proj/en_norm,  plot_gt_replaced)
-    
+
+    if opt.inference == 'marginal' then    
+      table.insert(lossPlotTab, {"Trng loss",plot_loss_x,plot_loss, 'with linespoints lt 1'})
+      table.insert(lossPlotTab, {"Vald loss",plot_val_loss_x, plot_val_loss, 'with linespoints lt 3'})
+      minY, maxY = minMax(plot_train_mm, plot_val_mm, plot_loss, plot_val_loss, 
+        plot_energies_proj/en_norm, plot_val_energies_proj/en_norm,  plot_gt_replaced)
+    end
+
 --    minY = math.max(0.001, minY/2)
 --    maxY=maxY*2
 --    print(minY, maxY)
