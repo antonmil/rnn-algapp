@@ -1,11 +1,11 @@
 %%
 addpath(genpath('.'))
-nRuns = 10;
+nRuns = 1;
 
 rng(321);
-if ~exist('Pair_M','var')
-    Pair_M=doMatching('Motor');
-end
+% if ~exist('Pair_M','var')
+    [Pair_M, allGphs, allFs]=doMatching('Motor');
+% end
 
 N=8;
 rnnSize = 64;
@@ -15,8 +15,8 @@ infIndex = 1; % 1=map, 2=marginal
 [gurModel, gurParams] = getGurobiModel(N);
 model_sign = sprintf('mt1_r%d_l%d_n%d_m%d_o2_s%d_i%d_valen',rnnSize, numLayers, N,N, solIndex, infIndex);
 model_name = 'trainHun';
-model_name = '0502Fs-1'; % GOOD ONE (also 0502Fs-1)
-model_name = '0502Fs-1'; %
+model_name = '0502Fs-2'; % GOOD ONE (also 0502Fs-1)
+model_name = '0503Bs-1'; %
 mBst = 10;
 doRandomize = true;
 % doRandomize = false;
@@ -24,13 +24,27 @@ doRandomize = true;
 allRes = {}; mInd = 0;
 
 
+fprintf('Testing %s - %s\n', model_name, model_sign);
 asgT.X=eye(N);
+
+allGphsSubSel = allGphs;
+allFs = allFs;
 
 for r = 1:nRuns
     fprintf('.');
 %     rng(3211211);
-    RM = Pair_M{1,randi(length(Pair_M))};    
-    [newK,gurResult] = selectSubset(RM, N, false, gurModel, gurParams);    
+    randSmpl = randi(length(Pair_M));
+    RM = Pair_M{1,randSmpl};    
+    [newK,gurResult,takePts] = selectSubset(RM, N, false, gurModel, gurParams);    
+
+    for ii=1:2
+        allGphsSubSel{randSmpl}{ii}.Pt=allGphs{randSmpl}{ii}.Pt(:,takePts);
+        allGphsSubSel{randSmpl}{ii}.vis=allGphs{randSmpl}{ii}.vis(takePts',takePts);
+        allGphsSubSel{randSmpl}{ii}.G=allGphs{randSmpl}{ii}.G(takePts,:);
+        allGphsSubSel{randSmpl}{ii}.H=allGphs{randSmpl}{ii}.H(takePts,:);
+        allGphsSubSel{randSmpl}{ii}.XP=allGphs{randSmpl}{ii}.XP(1,takePts);
+    end
+    
 
 %     runInfos.gurTime(r) = gurResult.runtime;
 %     [gurMat, gurAss] = getOneHot(gurResult.x);

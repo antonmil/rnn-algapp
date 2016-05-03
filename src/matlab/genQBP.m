@@ -93,10 +93,6 @@ for ttm=ttmodes
     data.allSolTimes = zeros(nSamples, 1);
     data.optres=false(nSamples,1);
     for m=1:mBst
-        if doMarginals
-            allocStr = sprintf('data.all_%d_BestMarginals = zeros(nSamples, N*M);',m);
-            eval(allocStr);
-        end
         allocStr = sprintf('data.all_%d_Proposals = zeros(nSamples, N*M);',m);
         eval(allocStr);
         allocStr = sprintf('data.all_%d_ProposalsInt = zeros(nSamples, N);',m);
@@ -228,7 +224,7 @@ for ttm=ttmodes
         if doMarginals
             data.allMarginals(n,:) = reshape(asgIpfpSMbst.marginals', 1, N*M);
             for m=1:mBst
-                assignStr = sprintf('data.all_%d_BestMarginals(n,:) = reshape(allM{%d}'', 1, N*M);',m,m);
+                assignStr = sprintf('data.all_%d_Proposals(n,:) = reshape(allM{%d}'', 1, N*M);',m,m);
                 eval(assignStr);
             end
         else            

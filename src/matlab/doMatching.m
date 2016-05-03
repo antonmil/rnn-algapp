@@ -1,4 +1,4 @@
-function Pair_M = doMatching(dataset)
+function [Pair_M, allGphs, allFs] = doMatching(dataset)
 
 if nargin<1, dataset='Car'; end
 
@@ -80,6 +80,8 @@ for nOut = 0:MaxOutliers
         GT{nOut+1,kFs}=asgT.X;
         Pair_M{nOut+1,kFs}=K;
         Unary{nOut+1,kFs}=Ct;
+        allGphs{nOut+1,kFs}=gphs;
+        allFs{nOut+1, kFs} = Fs;
 %         size(Ct,1)
         
                %% M-Best BP 

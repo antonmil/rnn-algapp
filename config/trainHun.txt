@@ -1,7 +1,7 @@
           model_index  1
              rnn_size  128
            num_layers  1
-                max_n  5
+                max_n  6
                 order  1
             inf_index  2
             sol_index  2

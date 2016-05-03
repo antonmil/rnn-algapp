@@ -1,4 +1,4 @@
-function [newK,result]=selectSubset(K,N, saveSample, model, params)
+function [newK,result,takePts]=selectSubset(K,N, saveSample, model, params)
 %%
 result = [];
 if nargin<3, saveSample = false; end

@@ -1204,7 +1204,8 @@ function evalBatchEnergy(sol, Q)
   return obj
 end
 
-function plotProgress(predictions,winID, winTitle)
+function plotProgress(predictions,winID, winTitle, save)
+  save = save or 0
   local mm=0 -- number of mismatches
   --  print(opt.daPredIndex)
   local predDA = nil
@@ -1263,7 +1264,7 @@ function plotProgress(predictions,winID, winTitle)
     gnuplot.raw('unset ytics')
     plotTab = getPredPlotTab(plotTab, predDA, 1)
     plotTab = getPredPlotTab(plotTab, sol, 2)
-    plot(plotTab, winID, winTitle, {}, 1)
+    plot(plotTab, winID, winTitle, {}, save)
     gnuplot.raw('set ytics')
   end
 

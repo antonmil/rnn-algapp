@@ -16,6 +16,7 @@ function plot(data, winID, winTitle, rawStr, save)
   --   if save == nil then save = false else
   --     if (save==true or save>0) then save=true else save=false end
   --   end
+--  print(save)
   save = save or 0
 
   if type(rawStr) ~= 'table' then return end  --  GNU Plot commands must be passed in a table
@@ -57,6 +58,7 @@ function plot(data, winID, winTitle, rawStr, save)
 
   -- divert to png if no X xAvailable  UPDATE: Always save as png if flag set
   --   print(save)
+--  print(save)
   if save>0 then
     --     print('saving')
     --     sleep(1)
