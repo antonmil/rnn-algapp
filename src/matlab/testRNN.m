@@ -4,18 +4,18 @@ nRuns = 10;
 
 rng(321);
 if ~exist('Pair_M','var')
-    Pair_M=doMatching();
+    Pair_M=doMatching('Motor');
 end
 
-N=8;
-rnnSize = 32;
+N=6;
+rnnSize = 16;
 numLayers = 1;
 solIndex = 1; % 1=integer, 2=distribution
 infIndex = 1; % 1=map, 2=marginal
 [gurModel, gurParams] = getGurobiModel(N);
 model_sign = sprintf('mt1_r%d_l%d_n%d_m%d_o2_s%d_i%d_valen',rnnSize, numLayers, N,N, solIndex, infIndex);
 model_name = 'trainHun';
-% model_name = '0501Es-2';
+% model_name = '0502An-5';
 mBst = 10;
 doRandomize = true;
 % doRandomize = false;
@@ -48,6 +48,7 @@ for r = 1:nRuns
     
     gurModel.Q = newK;
     gurResult = gurobi(gurModel, gurParams);
+%     gurResult
     runInfos.gurTime(r) = gurResult.runtime;    
     [gurMat, gurAss] = getOneHot(gurResult.x);
     acc = matchAsg(gurMat, asgT);
@@ -63,6 +64,7 @@ for r = 1:nRuns
     allRes{mInd}.acc(r) = acc;
     allRes{mInd}.obj(r) = obj;
     allRes{mInd}.time(r) = gurResult.runtime;
+    allRes{mInd}.optimal(r) = strcmpi(gurResult.status,'OPTIMAL');
     
 %     asgT.X = gurMat;
  
@@ -210,8 +212,8 @@ end
 mbstMethod = sprintf('%d-bstMar',mBst);
 mbstHAMethod = sprintf('%d-bstMarH',mBst);
 moptMethod = sprintf('%d-opt',mBst);
-fprintf('\n%15s|%8s|%8s|%8s\n','Method','acc','obj','time');
-fprintf('-------------------------------------\n');
+fprintf('\n%15s|%8s|%8s|%8s|%8s\n','Method','acc','obj','time','optim.');
+fprintf('-----------------------------------------------\n');
 % fprintf('%10s|%8.2f|%8.2f|%8.3f\n','IPFP',mean(runInfos.IPFPAcc),mean(runInfos.IPFPObj),mean(runInfos.IPFPTime));
 % fprintf('%10s|%8.2f|%8.2f|%8.3f\n','Gurobi',mean(runInfos.gurAcc),mean(runInfos.gurObj),mean(runInfos.gurTime));
 % fprintf('%10s|%8.2f|%8.2f|%8.3f\n','LSTM',mean(runInfos.allAcc),mean(runInfos.allObj),mean(runInfos.rnnTime));
@@ -221,11 +223,17 @@ fprintf('-------------------------------------\n');
 % fprintf('%10s|%8.2f|%8.2f|%8.3f\n',moptMethod,mean(runInfos.moptAcc),mean(runInfos.moptObj),mean(runInfos.moptTime));
 
 for mInd=1:length(allRes)
-    fprintf('%15s|%8.2f|%8.2f|%8.3f\n',allRes{mInd}.name,mean(allRes{mInd}.acc),mean(allRes{mInd}.obj),mean(allRes{mInd}.time));
+    if strcmp(allRes{mInd}.name,'Branch-and-cut')
+        fprintf('%15s|%8.2f|%8.2f|%8.3f|%8.1f %%\n',allRes{mInd}.name, ...
+            mean(allRes{mInd}.acc),mean(allRes{mInd}.obj),mean(allRes{mInd}.time),sum(allRes{mInd}.optimal)/nRuns*100);
+    else
+        fprintf('%15s|%8.2f|%8.2f|%8.3f\n',allRes{mInd}.name,mean(allRes{mInd}.acc),mean(allRes{mInd}.obj),mean(allRes{mInd}.time));
+    end
 end
 
 %% export to latex
 doExport=false;
+% doExport=true;
 if doExport
     fil = fopen(sprintf('../../../../papers/2016/anton-nips/numbers/matching-N%d.tex',N),'w');
     for mInd=1:length(allRes)

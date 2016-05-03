@@ -1,8 +1,8 @@
-function genQBP(N, mb, nTr, mBst, doMarginals)
+function genQBP(N, mb, nTr, mBst, doMarginals, uniqueBatch)
 %% quadratic program data and solutions
 
 addpath(genpath('.'));
-Pair_M = doMatching();
+Pair_M = doMatching('Car');
 
 % first set parameters
 % problem size
@@ -12,6 +12,7 @@ if nargin<2, mb = 10; end % minibatch size
 if nargin<3, nTr = 10; end % training batches
 if nargin<4, mBst = 5; end % how many solutions
 if nargin<5, doMarginals = false; end
+if nargin<6, uniqueBatch=0; end
 
 if factorial(N)<mBst
     mBst=factorial(N);
@@ -42,7 +43,7 @@ fprintf('Data alone will be %.1f MB\n',dataMB);
 % N=5;
 M=N;
 rng('shuffle')
-rng(1);
+% rng(1);
 
 
 Ns=N;
@@ -59,8 +60,9 @@ ttmodes = {'train','test'};
 % ttmodes = {'train'};
 
 for ttm=ttmodes
-    dv = datevec(now);
-    dv = [];
+    dv = [];    
+    if uniqueBatch, dv = datevec(now); end
+    
     ttmode = char(ttm);
     setTime = tic;
     % ttmode = 'test';
@@ -156,6 +158,7 @@ for ttm=ttmodes
                 result.status = 'optimal';
                 result.runtime = 0;
                 result.x = reshape(eye(N),1,N*N);
+
             else
                 result = gurobi(model, params); % run gurobi
             end
@@ -177,6 +180,16 @@ for ttm=ttmodes
                 [asgIpfpSMbst] = mBestIPFP(Q,mBst);  
             end
             tocMar = toc;
+            
+            % DO NOT USE GT ASSIGNMENT! GET SOLUTION VIA IPFP-S
+%             asgIpfpSMbst = mBestIPFP(Q,1);
+            oneSol = asgIpfpSMbst.X(:,:,1);                
+            % if not one-to-one, correct with hungarian
+            if ~all(sum(oneSol)==1) || ~all(sum(oneSol,2)==1)
+                oneSol = projectToValidAssignment(-oneSol);
+            end
+            result.x = reshape(oneSol, N*N,1);
+                
             
             result.x = binarize(result.x);
             if n<=1
@@ -228,7 +241,7 @@ for ttm=ttmodes
                 end
                 
                 % fill binary vector solution
-                oneSolVec = reshape(oneSol'', 1, N*N);
+                oneSolVec = reshape(oneSol, 1, N*N);
                 assignStr = sprintf('data.all_%d_Proposals(n,:) = oneSolVec;',m);
                 eval(assignStr);
                 

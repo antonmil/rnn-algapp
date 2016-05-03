@@ -1,4 +1,6 @@
-function Pair_M = doMatching()
+function Pair_M = doMatching(dataset)
+
+if nargin<1, dataset='Car'; end
 
 % clear variables;
 global footpath;
@@ -14,6 +16,10 @@ addpath(genpath([footpath '/STRIPES']));
 prSet(1);
 
 MaxInstance = 30;
+if strcmp(dataset,'Motor'), MaxInstance=20; 
+else dataset='Car'; MaxInstance=30;
+end
+
 NofAlgos = 1;
 %% src parameter
 tag = 'pas';
@@ -55,7 +61,11 @@ for nOut = 0:MaxOutliers
         par_mb{1,3}.mbst=param.mbest;
         par_mb{1,3}.chck_sols=param.chck_sols;
         %% src
-        wsSrc = carAsgSrc(kFs, nOut);
+        if strcmp(dataset,'Motor')
+            wsSrc = motorAsgSrc(kFs, nOut);
+        else
+            wsSrc = carAsgSrc(kFs, nOut);
+        end
         asgT = wsSrc.asgT;
         
         parG = st('link', 'del'); % Delaunay triangulation for computing the graphs

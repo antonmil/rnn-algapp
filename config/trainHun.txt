@@ -1,10 +1,10 @@
           model_index  1
              rnn_size  16
            num_layers  1
-                max_n  8
-                order  2
-            inf_index  1
-            sol_index  1
+                max_n  5
+                order  1
+            inf_index  2
+            sol_index  2
                sparse  0
          invert_input  0
          double_input  0
@@ -13,7 +13,7 @@
            supervised  1
          grad_replace  1
     diverse_solutions  1
-                 mbst  10
+                 mbst  2
         project_valid  0
             state_dim  4
            batch_size  1
@@ -27,7 +27,7 @@
         training_file  
            max_epochs  500000
       mini_batch_size  10
-       synth_training  1000
+       synth_training  500
           synth_valid  10
              full_set  0
 
@@ -44,7 +44,7 @@
        reshuffle_dets  1
            order_dets  0
          use_gt_input  1
-         random_epoch  0
+         random_epoch  10
        freq_reshuffle  0
               permute  0
           dummy_noise  0
@@ -75,4 +75,4 @@ lrng_rate_decay_after  -1
            decay_rate  0.97
                  seed  1
                opencl  0
-                gpuid  -1
+                gpuid  0

@@ -449,7 +449,7 @@ function feval()
   local solv, takeSol = torch.max(energies, 3)
   takeSol=takeSol:reshape(opt.mini_batch_size, 1):eq(2) -- keep prediction?
 --  print(torch.sum(takeSol)/opt.mini_batch_size*100 .. '% of GT replaced by prediction')
-  percReplaced = torch.sum(takeSol)/opt.mini_batch_size
+  percReplaced = torch.sum(takeSol)/opt.mini_batch_size*100
 
   -- PROJECT FOR PLOTTING
   local projSol = zeroTensor3(opt.mini_batch_size, opt.max_n * opt.max_m,1)
@@ -564,6 +564,7 @@ mot15_mota_nopos = {}
 local mProp = 0
 local optim_state = {learningRate = opt.lrng_rate, alpha = opt.decay_rate}
 local glTimer = torch.Timer()
+local readnth = 1
 for i = 1, opt.max_epochs do
   local epoch = i
   globiter = i
@@ -614,7 +615,16 @@ for i = 1, opt.max_epochs do
       time, optim_state.learningRate, glTimer:time().real, predMeanEnergy)
   end
 
-
+--  print((i-1)%(opt.synth_training*opt.random_epoch))
+  if i>1 and (i-1)%(opt.synth_training*opt.random_epoch) == 0 and opt.random_epoch ~= 0 then
+    readnth = readnth+1
+    if opt.problem == 'quadratic' then
+      -- call matlab to generate new data (1) size, 2) mbatch size, 3) #mini batches, 4) #proposals, 5) doMarginals?)
+--      local cmdstr = string.format('sh genData.sh %d %d %d %d %d',opt.max_n, opt.mini_batch_size, opt.synth_training, opt.mbst, opt.inf_index-1) 
+--      os.execute(cmdstr) 
+    end    
+    getData(opt, true, false, readnth)
+  end
 
   -- evaluate validation, save chkpt and print/plot loss (not too frequently)
   if (i % opt.eval_val_every) == 0 then
@@ -707,6 +717,7 @@ for i = 1, opt.max_epochs do
 --      end
 --      getData(opt, true, false)
 --    end
+
       
     -- heuristic: abort if no val. loss decrease for 3 last outputs
     if ((i - minValidLossIt) > 6*opt.eval_val_every) then
@@ -817,13 +828,14 @@ for i = 1, opt.max_epochs do
     plot(enPlotTab, 5, winTitle, rawStr, 1) -- plot and save (true)
 
 
-    printModelOptions(opt, modelParams) -- print parameters
+--    printModelOptions(opt, modelParams) -- print parameters
 
 
   end
 
   if (i == 1 or i % (opt.print_every*10) == 0) and i<opt.max_epochs then
     printModelOptions(opt, modelParams)
+    print('number of parameters in the model: ' .. params:nElement())
     printTrainingHeadline()       
   end -- headline
 

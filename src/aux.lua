@@ -282,18 +282,38 @@ end
 
 --------------------------------------------------------------------------
 --- read QBP data and solutions
-function readQBPData(ttmode, mBst, testfile)
+function readQBPData(ttmode, testfile, readnth)
+  readnth = readnth or 1
+  
+  local ProbTab, SolTab = {},{}
+  local ValProbTab, ValSolTab = {},{}
+
+  
   local inSize = opt.inSize
   if opt.double_input ~= 0 then opt.inSize =opt.inSize/2 end
 
   if ttmode ==nil or (ttmode~='train' and ttmode~='test') then ttmode = 'train' end
+  local dataDir = string.format('%sdata/%s/',getRootDir(), ttmode)
 
-  local ProbTab, SolTab = {},{}
-  local ValProbTab, ValSolTab = {},{}
-
-  local Qfile = string.format('%sdata/%s/QBP-%s_m%d_N%d_M%d.mat', 
-        getRootDir(), ttmode, opt.inference,opt.mbst,opt.max_n, opt.max_m);
-  if testfile ~= nil then Qfile = testfile end
+  local Qfile = ''
+  if testfile ~= nil then Qfile = testfile
+  else
+    -- find data file
+    local allDataFiles = {}
+    for file in lfs.dir(dataDir) do
+      local ff = dataDir..file
+      local srchstr=string.format('QBP[-]%s_m%d_N%d_M%d[-]0503',opt.inference,opt.mbst,opt.max_n, opt.max_m)      
+      if ff:find(srchstr) then
+        table.insert(allDataFiles, ff)
+      end
+    end
+    if allDataFiles == {} then error('no data found') end
+    readnth = math.min(readnth, #allDataFiles)
+    Qfile = allDataFiles[readnth]
+  end
+  
+--  local Qfile = string.format('%s/QBP-%s_m%d_N%d_M%d.mat', 
+--        dataDir, opt.inference,opt.mbst,opt.max_n, opt.max_m);
 
 --  local Qfile = string.format('%sdata/%s/QBP_N%d_M%d.mat',getRootDir(), ttmode, opt.max_n, opt.max_m);
   checkFileExist(Qfile,'Q cost file')
@@ -326,13 +346,6 @@ function readQBPData(ttmode, mBst, testfile)
     local loaded = mattorch.load(Solfile)
     allSol = loaded.allMarginals:t() -- transpose because Matlab is first-dim-major
     --    print(allSol[1]:sub(1,7))
-    if mBst ~= nil then
-      local mBstField = string.format('all_%d_BestMarginals',mBst)
-      allSol = loaded[mBstField]:t() -- transpose because Matlab is first-dim-major
-      --      print(allSol[1]:sub(1,7))
-      --      abort()
-      -- transpose because Matlab is first-dim-major
-    end
   end
 
   allQ=allQ:float()
@@ -424,36 +437,43 @@ end
 
 --------------------------------------------------------------------------
 --- read QBP data and solutions
-function readQBPallMProposals(ttmode, mBst)
+function readQBPallMProposals(ttmode, mBst, readnth)
+  readnth = readnth or 1
+  local SolTab = {},{}
+  local ValSolTab = {},{}
+
   local inSize = opt.inSize
   if opt.double_input ~= 0 then opt.inSize =opt.inSize/2 end
 
   if ttmode ==nil or (ttmode~='train' and ttmode~='test') then ttmode = 'train' end
+  local dataDir = string.format('%sdata/%s/',getRootDir(), ttmode)
+  
 
-  local SolTab = {},{}
-  local ValSolTab = {},{}
 
 
-  local Solfile = string.format('%sdata/%s/QBP-%s_m%d_N%d_M%d.mat', 
-        getRootDir(), ttmode, opt.inference,opt.mbst,opt.max_n, opt.max_m);
+  local Solfile = ''
+  -- find data file
+  local allDataFiles = {}
+  for file in lfs.dir(dataDir) do
+    local ff = dataDir..file
+    local srchstr=string.format('QBP[-]%s_m%d_N%d_M%d[-]0503',opt.inference,opt.mbst,opt.max_n, opt.max_m)      
+    if ff:find(srchstr) then
+      table.insert(allDataFiles, ff)
+    end
+  end
+  if allDataFiles == {} then error('no data found') end
+  readnth = math.min(readnth, #allDataFiles)
+  Solfile = allDataFiles[readnth]
+--  local Solfile = string.format('%sdata/%s/QBP-%s_m%d_N%d_M%d.mat', 
+--        getRootDir(), ttmode, opt.inference,opt.mbst,opt.max_n, opt.max_m);
+  
+        
+          
   local allSol = {}
 
---  if opt.inference == 'map' then
---    if opt.solution == 'integer' then
-----      Solfile = string.format('%sdata/%s/QBP_N%d_M%d.mat',getRootDir(), ttmode, opt.max_n, opt.max_m);
---      checkFileExist(Solfile,'solution file')
---      local loaded = mattorch.load(Solfile)
---      allSol = loaded.allSolInt:t() -- transpose because Matlab is first-dim-major
---    elseif opt.solution == 'distribution' then
-----      Solfile = string.format('%sdata/%s/QBP_N%d_M%d.mat',getRootDir(), ttmode, opt.max_n, opt.max_m);
---      checkFileExist(Solfile,'solution file')
---      local loaded = mattorch.load(Solfile)
---      allSol = loaded.allSol:t() -- transpose because Matlab is first-dim-major
---    end
---  elseif opt.inference == 'marginal' then
---    Solfile = string.format('%sdata/%s/QBP_N%d_M%d.mat',getRootDir(), ttmode, opt.max_n, opt.max_m);
     checkFileExist(Solfile,'solution file')
     local loaded = mattorch.load(Solfile)
+    pm('Loaded data file '..Solfile)
     --    allSol = loaded.allMarginals:t() -- transpose because Matlab is first-dim-major
     allSol = nil
     --    print(allSol[1]:sub(1,7))
@@ -469,7 +489,7 @@ function readQBPallMProposals(ttmode, mBst)
           mBstField = string.format('all_%d_ProposalsInt',mBst)
         end
       end
---      print(mBstField)
+      pm('loading var '..mBstField)
       allSol = loaded[mBstField]:t() -- transpose because Matlab is first-dim-major
       --      print(mBst)
       --      print(allSol[1])
@@ -489,7 +509,7 @@ function readQBPallMProposals(ttmode, mBst)
 
   allSol=allSol:float()
 
-  pm('Loaded soln matrix of size '..allSol:size(1) .. ' x '..allSol:size(2))
+--  pm('Loaded soln matrix of size '..allSol:size(1) .. ' x '..allSol:size(2))
 
   --  allQ = dataToGPU(allQ)
   --  allSol = dataToGPU(allSol)
@@ -621,7 +641,8 @@ function computeMarginals(CostTab)
   return SolTab
 end
 
-function getData(opt, getTraining, getValidation)
+function getData(opt, getTraining, getValidation, readnth)
+  readnth = readnth or 1
   local _
   pm('getting training/validation data...')
   if opt.problem == 'linear' then
@@ -630,34 +651,26 @@ function getData(opt, getTraining, getValidation)
     if getValidation then ValCostTab,ValSolTab = genHunData(opt.synth_valid) end
   elseif opt.problem == 'quadratic'  then
     if getTraining and getValidation then
-      TrCostTab,TrSolTab,ValCostTab,ValSolTab = readQBPData('train')
+      TrCostTab,TrSolTab,ValCostTab,ValSolTab = readQBPData('train', nil, readnth)
       -- mbest marginals
       if opt.mbst > 0 then
---        local mBstField = nil
---        if opt.inference == 'marginal' then
---          mBstField = opt.string.format('all_%d_BestMarginals',mBstMar)
---        elseif opt.inference == 'map' then
---          if opt.solution == 'integer' then
---            mBstField = opt.string.format('all_%d_Proposals',mBstMar)
---          elseif opt.solution == 'distribution' then
---            mBstField = opt.string.format('all_%d_ProposalsInt',mBstMar)
---          end
---        end
         --      if opt.solution == 'marginal' then
         TrSolTab_m_Prop, ValSolTab_m_Prop = {}, {}
         for m = 1,opt.mbst do
           TrSolTab_m_Prop[m], ValSolTab_m_Prop[m] = {}, {}
-          TrSolTab_m_Prop[m], ValSolTab_m_Prop[m] =  readQBPallMProposals('train',m)
---                  print(m)
---                  print(TrSolTab_m_Prop[m][1])
---                  sleep(1)
+          TrSolTab_m_Prop[m], ValSolTab_m_Prop[m] =  readQBPallMProposals('train',m, readnth)
         end
       end
-      --      print(#TrSolTab_m_BestMarginals)
-      --      print(#ValSolTab_m_BestMarginals)
-      --      abort()
     elseif getTraining then
-      TrCostTab,TrSolTab = readQBPData('train')
+      TrCostTab,TrSolTab = readQBPData('train', nil, readnth)
+      if opt.mbst > 0 then
+        --      if opt.solution == 'marginal' then
+        TrSolTab_m_Prop = {}
+        for m = 1,opt.mbst do
+          TrSolTab_m_Prop[m] = {}
+          TrSolTab_m_Prop[m] =  readQBPallMProposals('train',m, readnth)
+        end
+      end      
     end
   end
 
