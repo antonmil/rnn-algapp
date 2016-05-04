@@ -35,11 +35,11 @@ allFs = allFs;
 
 for r = nRuns
     fprintf('.');
-    %     rng(3211211);
+%     rng(3211211);
     randSmpl = randi(length(Pair_M));
-    RM = Pair_M{1,randSmpl};
-    [newK,gurResult,takePts] = selectSubset(RM, N, false, gurModel, gurParams);
-    
+    RM = Pair_M{1,randSmpl};    
+    [newK,gurResult,takePts] = selectSubset(RM, N, false, gurModel, gurParams);    
+
     for ii=1:2
         allGphsSubSel{randSmpl}{ii}.Pt=allGphs{randSmpl}{ii}.Pt(:,takePts);
         allGphsSubSel{randSmpl}{ii}.vis=allGphs{randSmpl}{ii}.vis(takePts',takePts);
@@ -48,33 +48,33 @@ for r = nRuns
         allGphsSubSel{randSmpl}{ii}.XP=allGphs{randSmpl}{ii}.XP(1,takePts);
     end
     
-    
-    %     runInfos.gurTime(r) = gurResult.runtime;
-    %     [gurMat, gurAss] = getOneHot(gurResult.x);
-    
+
+%     runInfos.gurTime(r) = gurResult.runtime;
+%     [gurMat, gurAss] = getOneHot(gurResult.x);
+
     % randomize
     GTAss = 1:N;
     if doRandomize
         canSol = eye(N);
         [newK, newSol, newOrder]=permuteResult(newK, canSol(:)');
         [newSolMat, GTAss] = getOneHot(newSol);
-        asgT.X = eye(N);
+        asgT.X = eye(N);   
         asgT.X = asgT.X(GTAss',:);
-        %         asgT.X = asgT.X(:,GTAss);
+%         asgT.X = asgT.X(:,GTAss);
     end
-    %     newK(~~newK) = rand;
+%     newK(~~newK) = rand;
     
     gurModel.Q = newK;
     gurResult = gurobi(gurModel, gurParams);
-    %     gurResult
-    runInfos.gurTime(r) = gurResult.runtime;
+%     gurResult
+    runInfos.gurTime(r) = gurResult.runtime;    
     [gurMat, gurAss] = getOneHot(gurResult.x);
     acc = matchAsg(gurMat, asgT);
     obj = gurResult.x(:)' * newK * gurResult.x(:);
-    %     fprintf('Gur Accuracy: %.2f\n\n',acc)
+%     fprintf('Gur Accuracy: %.2f\n\n',acc)
     
-    %     runInfos.gurAcc(r)=acc;
-    %     runInfos.gurObj(r) = obj;
+%     runInfos.gurAcc(r)=acc;
+%     runInfos.gurObj(r) = obj;    
     %%% GUROBI
     mInd=1;
     allRes{mInd}.name = 'Branch-and-cut';
@@ -85,23 +85,23 @@ for r = nRuns
     allRes{mInd}.optimal(r) = strcmpi(gurResult.status,'OPTIMAL');
     allRes{mInd}.resMat(:,:,r) = gurMat;
     
-    %     asgT.X = gurMat;
-    
+%     asgT.X = gurMat;
+ 
     
     if length(unique(gurAss)) ~= length(gurAss)
-        %         fprintf('Gurobi solution not one-to-one!\n')
+%         fprintf('Gurobi solution not one-to-one!\n')
     end
     
-    
+
     
     
     % IPFP-S
     [pars, algs] = gmPar(2);
     
-    Ct = ones(sqrt(size(newK,1)));
+    Ct = ones(sqrt(size(newK,1)));    
     asgIpfpS = gm(newK, Ct, asgT, pars{6}{:});
     IPFPVec = reshape(asgIpfpS.X,N*N,1);
-    
+
     mInd=mInd+1;
     allRes{mInd}.name = sprintf('IPFP-S');
     allRes{mInd}.cite = 'Leordeanu:2012:IJCV';
@@ -111,10 +111,10 @@ for r = nRuns
     allRes{mInd}.resMat(:,:,r) = asgIpfpS.X';
     
     
-    %     runInfos.IPFPTime(r) = asgIpfpS.tim;
-    %     runInfos.IPFPObj(r) = IPFPVec' * newK * IPFPVec;
-    %     runInfos.IPFPAcc(r) = matchAsg(asgIpfpS.X', asgT);
-    
+%     runInfos.IPFPTime(r) = asgIpfpS.tim;
+%     runInfos.IPFPObj(r) = IPFPVec' * newK * IPFPVec;
+%     runInfos.IPFPAcc(r) = matchAsg(asgIpfpS.X', asgT);
+
     % IPFP 'opt-out-of-m'
     asgIpfpSMbst = mBestIPFP(newK,mBst,GTAss);
     [~,m] = max(asgIpfpSMbst.obj);
@@ -127,16 +127,16 @@ for r = nRuns
     allRes{mInd}.time(r) = sum(asgIpfpSMbst.time);
     allRes{mInd}.resMat(:,:,r) = asgIpfpSMbst.X(:,:,m)';
     
-    %     runInfos.moptTime(r) = sum(asgIpfpSMbst.time);
-    %     runInfos.moptObj(r) = moptVec' * newK * moptVec;
-    %     runInfos.moptAcc(r) = matchAsg(asgIpfpSMbst.X(:,:,m)', asgT);
+%     runInfos.moptTime(r) = sum(asgIpfpSMbst.time);
+%     runInfos.moptObj(r) = moptVec' * newK * moptVec;
+%     runInfos.moptAcc(r) = matchAsg(asgIpfpSMbst.X(:,:,m)', asgT);
     
     
-    % marginals
+    % marginals    
     mbstVec = reshape(asgIpfpSMbst.Xmbst,N*N,1);
-    %     runInfos.mbstTime(r) = sum(asgIpfpSMbst.time);
-    %     runInfos.mbstObj(r) = mbstVec' * newK * mbstVec;
-    %     runInfos.mbstAcc(r) = matchAsg(asgIpfpSMbst.Xmbst', asgT);
+%     runInfos.mbstTime(r) = sum(asgIpfpSMbst.time);
+%     runInfos.mbstObj(r) = mbstVec' * newK * mbstVec;
+%     runInfos.mbstAcc(r) = matchAsg(asgIpfpSMbst.Xmbst', asgT);
     
     mInd=mInd+1;
     allRes{mInd}.name = sprintf('IPFP-%dbstMar',mBst);
@@ -151,9 +151,9 @@ for r = nRuns
     [matchHun, costHun] = hungarian(-asgIpfpSMbst.marginals);
     thun=toc(thun);
     hunVec = reshape(matchHun,N*N,1);
-    %     runInfos.mbstHATime(r) = runInfos.mbstTime(r) + thun;
-    %     runInfos.mbstHAObj(r) = hunVec' * newK * hunVec;
-    %     runInfos.mbstHAAcc(r) = matchAsg(matchHun', asgT);
+%     runInfos.mbstHATime(r) = runInfos.mbstTime(r) + thun;
+%     runInfos.mbstHAObj(r) = hunVec' * newK * hunVec;
+%     runInfos.mbstHAAcc(r) = matchAsg(matchHun', asgT);
     mInd=mInd+1;
     allRes{mInd}.name = sprintf('IPFP-%dbstMarHA',mBst);
     allRes{mInd}.acc(r) = matchAsg(matchHun', asgT);
@@ -161,7 +161,7 @@ for r = nRuns
     allRes{mInd}.time(r) = allRes{mInd-1}.time(r) + thun;
     allRes{mInd}.resMat(:,:,r) = matchHun';
     
-    % LSTM
+    
     allQ=full(newK); allQ=allQ(:)';
     gurResult.x = binarize(gurResult.x);
     allSol = reshape(asgT.X', 1, N*N);
@@ -169,67 +169,67 @@ for r = nRuns
     allMarginals = reshape(asgIpfpSMbst.marginals',1,N*N);
     testfilebase='test';
     testfile = sprintf('%sdata/%s_%d.mat',getRootDir,testfilebase,N);
-    save(testfile,'allQ','allSol','allSolInt','allMarginals');
+    save(testfile,'allQ','allSol','allSolInt','allMarginals');   
     
     try
-        cmd = sprintf('cd ..; pwd; th %s.lua -model_name %s -model_sign %s -suppress_x 1 -test_file %s','test', ...
-            model_name , model_sign, testfilebase);
-        [a,b] = system(cmd);
-        if a~=0
-            %         fprintf('Error running RNN!\n'); b
-            %         break;
-        end
-        
-        resRaw = dlmread(sprintf('../../out/%s_%s.txt',model_name, model_sign));
-        runInfos.rnnTime(r) = resRaw(1,3);
-        %     resRaw(:,1) = reshape(reshape(resRaw(:,1),N,N)',N*N,1);
-        resVec = resRaw(:,1);
-        [myResMat, myAss] = getOneHot(resVec);
-        %     myAss
-        if length(unique(myAss)) ~= length(myAss)
-            %         fprintf('RNN solution not one-to-one!\n')
-        end
-        
-        %     obj = resVec(:)' * newK * resVec(:);
-        %     acc = matchAsg(myResMat, asgT);
-        %     fprintf('RNN Accuracy: %.2f\n',acc)
-        %     runInfos.allAcc(r)=acc;
-        %     runInfos.allObj(r) = obj;
-        
-        
-        mInd=mInd+1;
-        allRes{mInd}.name = 'LSTM';
-        allRes{mInd}.acc(r) = matchAsg(myResMat, asgT);
-        allRes{mInd}.obj(r) = resVec(:)' * newK * resVec(:);
-        allRes{mInd}.time(r) = resRaw(1,3);
-        allRes{mInd}.resMat(:,:,r) = myResMat;
-        
-        % resolve with hungarian
-        resObj = resRaw(:,2);
-        resMat = reshape(resObj,N,N)';
-        thun = tic;
-        [matchHun, costHun] = hungarian(-resMat);
-        thun=toc(thun);
-        hunVec = reshape(matchHun',N*N,1);
-        %     runInfos.rnnHunTime(r) = runInfos.rnnTime(r) + thun;
-        %     runInfos.rnnHunObj(r) = hunVec' * newK * hunVec;
-        %     runInfos.rnnHunAcc(r) = matchAsg(matchHun, asgT);
-        mInd=mInd+1;
-        allRes{mInd}.name = 'LSTM-HA';
-        allRes{mInd}.acc(r) = matchAsg(matchHun, asgT);
-        allRes{mInd}.obj(r) = hunVec' * newK * hunVec;
-        allRes{mInd}.time(r) = resRaw(1,3)+thun;
-        allRes{mInd}.resMat(:,:,r) = matchHun;
-        
-        %     pause
+    cmd = sprintf('cd ..; pwd; th %s.lua -model_name %s -model_sign %s -suppress_x 1 -test_file %s','test', ...
+        model_name , model_sign, testfilebase);
+    [a,b] = system(cmd);    
+    if a~=0
+%         fprintf('Error running RNN!\n'); b
+%         break;
+    end
+
+    resRaw = dlmread(sprintf('../../out/%s_%s.txt',model_name, model_sign));
+    runInfos.rnnTime(r) = resRaw(1,3);
+%     resRaw(:,1) = reshape(reshape(resRaw(:,1),N,N)',N*N,1);
+    resVec = resRaw(:,1);
+    [myResMat, myAss] = getOneHot(resVec);
+%     myAss
+    if length(unique(myAss)) ~= length(myAss)
+%         fprintf('RNN solution not one-to-one!\n')
+    end
+    
+%     obj = resVec(:)' * newK * resVec(:);
+%     acc = matchAsg(myResMat, asgT);
+%     fprintf('RNN Accuracy: %.2f\n',acc)        
+%     runInfos.allAcc(r)=acc;
+%     runInfos.allObj(r) = obj;
+    
+    
+    mInd=mInd+1;
+    allRes{mInd}.name = 'LSTM';
+    allRes{mInd}.acc(r) = matchAsg(myResMat, asgT);
+    allRes{mInd}.obj(r) = resVec(:)' * newK * resVec(:);
+    allRes{mInd}.time(r) = resRaw(1,3);
+    allRes{mInd}.resMat(:,:,r) = myResMat;
+    
+    % resolve with hungarian
+    resObj = resRaw(:,2);
+    resMat = reshape(resObj,N,N)';
+    thun = tic;
+    [matchHun, costHun] = hungarian(-resMat);
+    thun=toc(thun);
+    hunVec = reshape(matchHun',N*N,1);
+%     runInfos.rnnHunTime(r) = runInfos.rnnTime(r) + thun;
+%     runInfos.rnnHunObj(r) = hunVec' * newK * hunVec;
+%     runInfos.rnnHunAcc(r) = matchAsg(matchHun, asgT);    
+    mInd=mInd+1;
+    allRes{mInd}.name = 'LSTM-HA';
+    allRes{mInd}.acc(r) = matchAsg(matchHun, asgT);  
+    allRes{mInd}.obj(r) = hunVec' * newK * hunVec;
+    allRes{mInd}.time(r) = resRaw(1,3)+thun;
+    allRes{mInd}.resMat(:,:,r) = matchHun;
+
+%     pause
     catch err
         fprintf('WARNING. LSTM IGNORED. %s\n',err.message);
     end
     
-    %     genFig(2, r, allFs, allGphsSubSel, randSmpl, asgT, allRes);
-    %     genFig(6, r, allFs, allGphsSubSel, randSmpl, asgT, allRes);
-    %     genFig(7, r, allFs, allGphsSubSel, randSmpl, asgT, allRes);
-    
+    genFig(2, r, allFs, allGphsSubSel, randSmpl, asgT, allRes);
+    genFig(6, r, allFs, allGphsSubSel, randSmpl, asgT, allRes);
+    genFig(7, r, allFs, allGphsSubSel, randSmpl, asgT, allRes);
+
 end
 
 % fprintf('Average RNN Accuracy: %.2f\n',mean(runInfos.allAcc))

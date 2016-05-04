@@ -54,7 +54,12 @@ solTable = nil
 
 pm('getting training/validation data...')
 if opt.problem == 'linear' then
+  if sopt.test_file == 'random' then
     ValCostTab,ValSolTab = genHunData(opt.synth_valid)
+  else
+    local testfile = string.format('%sdata/%s_%d.mat',getRootDir(),sopt.test_file,opt.max_n);
+    _,_,ValCostTab,ValSolTab = readQBPData('test', testfile)
+  end
 elseif opt.problem == 'quadratic' then
   local testfile = string.format('%sdata/%s_%d.mat',getRootDir(),sopt.test_file,opt.max_n);
 --  print(testfile)
@@ -164,6 +169,7 @@ for t=1,T do
   DA[t] = decode(predictions, t)
 
 end
+local predDA = nil
 if opt.supervised == 0 then 
   predDA = predictions[1][opt.daPredIndex+1]:reshape(opt.mini_batch_size*opt.max_n,opt.nClasses):sub(1,opt.max_n)
 else

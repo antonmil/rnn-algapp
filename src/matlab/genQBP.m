@@ -43,7 +43,7 @@ fprintf('Data alone will be %.1f MB\n',dataMB);
 % N=5;
 M=N;
 rng('shuffle')
-% rng(1);
+rng(1);
 
 
 Ns=N;
