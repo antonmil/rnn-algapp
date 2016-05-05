@@ -142,26 +142,28 @@ for f=2:Frame
     Mes_Tar=false(Vmt+Umt,Vmt+Umt,Zmt);
     for r=1:Kt
         Final_probabilty{1,r}=cell(1,N_Target);
-        if strcmp(Tracking_Scheme,'JPDA')
             Mes_Tar(:,:,r)=[false(Vmt,Vmt+Umt);Mes_Tar2(:,:,r) false(Umt,Umt)];
             % Final_probabilty{1,r}(1,exist_ind) =JPDA_Probabilities(Mes_Tar(:,:,r),Target_Obs_indx(exist_ind,r)',Target_probabilty(exist_ind,r)');
             % Final_probabilty{1,r}(1,exist_ind) =Multiscan_JPDA_Probabilities(Mes_Tar(:,:,r),Target_Obs_indx(exist_ind,r)',Target_probabilty(exist_ind,r)');
             Final_probabilty{1,r}(1,exist_ind) =Approx_Multiscan_JPDA_Probabilities(Mes_Tar(:,:,r),Rt_In_Pr(exist_ind,r),mbest);
-
-            
-        elseif strcmp(Tracking_Scheme,'LSTM')
-            Fi_probabilty=LSTMDA(Assign_matrix{r,k});
+            GT_marginals = cell2mat(Final_probabilty{1,r})';
+            if ~all(GT_marginals(:,1)==0)
+                error('missed detection marginal is not zero')
+            end
+            GT_marginals=GT_marginals(:,2:end);
+            for jws=1:size(GT_marginals,1)
+            GT_marginals(jws,Hypo_matrix{r,k}(jws,:)) = GT_marginals(jws,:);
+            end
+            Fi_probabilty=LSTMDA(Assign_matrix{r,k},GT_marginals);
             Fi_probabilty2=Fi_probabilty;
             szzi= size(Fi_probabilty,2);
             for jws=1:szzi
-              Fi_probabilty2(jws,Hypo_matrix{r2,k}(jws,:)) = Fi_probabilty(jws,:);
+              Fi_probabilty2(jws,Hypo_matrix{r,k}(jws,:)) = Fi_probabilty(jws,:);
             end
             
             Final_probabilty{1,r}=mat2cell([zeros(szzi,1) Fi_probabilty2]',(szzi+1),ones(1,szzi));
             
-        else
-            error('"Tracking_Scheme" should be either "LSTM" or "JPDA"')
-        end
+
     end
     %**************************** Update step *****************************
     
