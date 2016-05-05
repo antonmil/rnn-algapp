@@ -105,6 +105,34 @@ function getOneCost(seed)
   if seed ~= nil then torch.manualSeed(seed) end
 
   local oneCost = torch.rand(opt.mini_batch_size*opt.max_n, opt.max_m)
+  
+  local randN = math.random(5)
+--  randN=5
+  local randProb = torch.rand(opt.mini_batch_size, opt.max_n * opt.max_m)
+  local oneCost = torch.pow(torch.abs(randProb ),randN)
+--  for mb=1,opt.mini_batch_size do
+--    local mat = torch.zeros(opt.max_n, opt.max_m)
+--    for n=1,opt.max_n do
+--      local randT = math.random(opt.max_m)
+--      local probVec = torch.zeros(opt.max_m)
+--      probVec[randT] = 1
+----      print(probVec)
+--      probVec = makePseudoProb(probVec, 0.01)
+--      if torch.rand(1):squeeze()<.0 then
+--        randT = math.random(opt.max_m)
+--        probVec[randT] = 1
+--        probVec = makePseudoProb(probVec, 0.01)
+--      end      
+----      print(probVec)
+----      abort()
+--      mat[n] = probVec      
+--    end
+----    print(mat)
+--    
+----    abort()
+--    oneCost[mb] = mat:reshape(opt.max_n*opt.max_m)
+--  end
+      
   --   local fillMatrix = torch.ones(opt.mini_batch_size*opt.max_n,opt.max_m) * opt.miss_thr
   --   if opt.dummy_noise ~= 0 then
   --     fillMatrix = fillMatrix + torch.rand(opt.mini_batch_size*opt.max_n,opt.max_m) * opt.dummy_noise
@@ -584,6 +612,7 @@ function computeMarginals(CostTab)
     local batchMarginals = torch.zeros(opt.mini_batch_size,N*M):float()
     for mb=1,opt.mini_batch_size do
       local C = dataToCPU(v:sub(mb,mb))
+      C = -torch.log(C) -- !!! 
       --      print(k,mb)
 
 
@@ -598,7 +627,7 @@ function computeMarginals(CostTab)
         elseif opt.problem=='quadratic' then
           hypCost = evalSol(var, nil, C)   -- get solution for one assignment hypothesis
         end
-        if opt.exp_cost ~= 0 then hypCost = torch.exp(hypCost) end
+        if opt.exp_cost ~= 0 then hypCost = torch.exp(-hypCost) end
         --        print(hypCost)
         --        print(torch.exp(-hypCost))
         --        marginals[idx] = marginals[idx] + torch.exp(-hypCost)   -- add to joint matrix

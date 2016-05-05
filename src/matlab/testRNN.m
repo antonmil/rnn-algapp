@@ -1,10 +1,10 @@
 %%
 addpath(genpath('.'))
-nRuns = 1:1;
+nRuns = 1:10;
 
 
 rng('shuffle');
-rng(3210323);
+rng(321);
 if ~exist('Pair_M','var')
     [Pair_M, allGphs, allFs]=doMatching('Motor');
 end
@@ -18,7 +18,7 @@ infIndex = 1; % 1=map, 2=marginal
 model_sign = sprintf('mt1_r%d_l%d_n%d_m%d_o2_s%d_i%d_valen',rnnSize, numLayers, N,N, solIndex, infIndex);
 model_name = 'trainHun';
 model_name = '0502Fs-2'; % GOOD ONE (also 0502Fs-1)
-% model_name = '0504As-1'; %
+model_name = '0505As-2'; %
 
 mBst = 10;
 doRandomize = true;
@@ -252,7 +252,7 @@ fprintf('-----------------------------------------------\n');
 for mInd=1:length(allRes)
     if strcmp(allRes{mInd}.name,'Branch-and-cut')
         fprintf('%15s|%8.2f|%8.2f|%8.3f|%8.1f %%\n',allRes{mInd}.name, ...
-            mean(allRes{mInd}.acc),mean(allRes{mInd}.obj),mean(allRes{mInd}.time),sum(allRes{mInd}.optimal)/nRuns*100);
+            mean(allRes{mInd}.acc),mean(allRes{mInd}.obj),mean(allRes{mInd}.time),sum(allRes{mInd}.optimal)/length(nRuns)*100);
     else
         fprintf('%15s|%8.2f|%8.2f|%8.3f\n',allRes{mInd}.name,mean(allRes{mInd}.acc),mean(allRes{mInd}.obj),mean(allRes{mInd}.time));
     end

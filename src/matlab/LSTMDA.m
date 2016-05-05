@@ -23,6 +23,7 @@ try
     cmd = sprintf('cd ../..; pwd; th %s.lua -model_name %s -model_sign %s -suppress_x 1 -test_file %s','test', ...
         model_name , model_sign, testfilebase);
     [a,b] = system(cmd);
+    b
     if a~=0, fprintf('Error running RNN!\n'); end
 catch err
     fprintf('WARNING. LSTM IGNORED. %s\n',err.message);
@@ -32,5 +33,5 @@ resRaw = dlmread(sprintf('../../../out/%s_%s.txt',model_name, model_sign));
 runtime = resRaw(1,3);
 %     resRaw(:,1) = reshape(reshape(resRaw(:,1),N,N)',N*N,1);
 da = resRaw(:,2);
-da = reshape(da, N, N);
+da = reshape(da, N, N)';
 

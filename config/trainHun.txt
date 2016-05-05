@@ -1,7 +1,7 @@
           model_index  1
              rnn_size  128
            num_layers  1
-                max_n  6
+                max_n  5
                 order  1
             inf_index  2
             sol_index  2
@@ -27,7 +27,7 @@
         training_file  
            max_epochs  500000
       mini_batch_size  10
-       synth_training  1000
+       synth_training  100
           synth_valid  10
              full_set  0
 
@@ -50,9 +50,9 @@
           dummy_noise  0
            train_type  0
           
-          print_every  100
-       eval_val_every  1000
-           plot_every  1000
+          print_every  10
+       eval_val_every  100
+           plot_every  100
               dropout  0.1
              temp_win  4
            suppress_x  0
