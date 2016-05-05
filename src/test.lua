@@ -7,7 +7,7 @@ require 'gnuplot'
 require 'util.misc'
 require 'mattorch'
 
-require 'aux'
+require 'auxiliary'
 
 
 cmd = torch.CmdLine()

@@ -17,7 +17,7 @@ local RNNE = require 'model.RNNEncoder'
 local RNND = require 'model.RNNDecoder'
 
 -- project specific auxiliary functions
-require 'aux'
+require 'auxiliary'
 
 -- for deterministic processing
 torch.manualSeed(1)

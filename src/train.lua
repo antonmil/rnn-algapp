@@ -16,7 +16,7 @@ require 'util.misc'   -- all the rest
 local RNN = require 'model.RNN'
 
 -- project specific auxiliary functions
-require 'aux'
+require 'auxiliary'
 
 -- for deterministic processing
 torch.manualSeed(1)
