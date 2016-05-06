@@ -8,7 +8,7 @@ rng(3);
 K= 20;                                 %number of frames
 T= 1;                                   %sampling period [s]
 OSPA.p = 2;OSPA.c = 25;OSPA.l = 25;
-Num_Exp=100; % number of monte carlo experiments
+Num_Exp=10; % number of monte carlo experiments
 
 
 u_image=30;v_image=30;
@@ -165,7 +165,7 @@ set(gca,'YTick',5:10:30),set(gca,'XTick',5:10:30),
 %% 1 Frame, JPDA
 % JPDA Parameters
 JPDA_multiscale=1; % Time-Frame windows
-Tracking_Scheme='JPDA';
+Tracking_Scheme='JPDA_fst';
 [XeT,~,~,~,Ff,Term_Con,~]=MULTISCAN_JPDA0(XYZ,F,Q,H,R,X0,P0,Tracking_Scheme,JPDA_P,TN_H(end),...
     JPDA_multiscale,PD,S_limit,mui0,TPM,TPM_Option,H_TPM);
 

@@ -146,19 +146,13 @@ for f=2:Frame
     for r=1:Kt
         Final_probabilty{1,r}=cell(1,N_Target);
         Mes_Tar(:,:,r)=[false(Vmt,Vmt+Umt);Mes_Tar2(:,:,r) false(Umt,Umt)];
-        if strcmp(Tracking_Scheme,'JPDA') ||strcmp(Tracking_Scheme,'JPDA_HA')
+        if strcmp(Tracking_Scheme,'JPDA') 
             Final_probabilty{1,r}(1,exist_ind) =Approx_Multiscan_JPDA_Probabilities(Mes_Tar(:,:,r),Rt_In_Pr(exist_ind,r),mbest);
+        elseif strcmp(Tracking_Scheme,'JPDA_fst')||strcmp(Tracking_Scheme,'JPDA_HA')
+            Fi_probabilty = Efficient_JPDA(Assign_matrix{r,k});
+            Fi_probabilty2=Fi_probabilty;
             if strcmp(Tracking_Scheme,'JPDA_HA')
-                GT_marginals = cell2mat(Final_probabilty{1,r})';
-                if ~all(GT_marginals(:,1)==0)
-                    error('missed detection marginal is not zero')
-                end
-                GT_marginals=GT_marginals(:,2:end);
-                for jws=1:size(GT_marginals,1)
-                    GT_marginals(jws,Hypo_matrix{r,k}(jws,:)) = GT_marginals(jws,:);
-                end
-                
-                [HA,~] = Hungarian(-log(GT_marginals));
+                [HA,~] = Hungarian(-log(Fi_probabilty));
             end
         elseif strcmp(Tracking_Scheme,'LSTM')
             [Fi_probabilty, ~, HA]=LSTMDA(Assign_matrix{r,k});
