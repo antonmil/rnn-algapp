@@ -166,7 +166,7 @@ for f=2:Frame
             Fi_probabilty2=Fi_probabilty;
             szzi= size(Fi_probabilty,2);
             for jws=1:szzi
-              Fi_probabilty2(jws,Hypo_matrix{r,k}(jws,:)) = Fi_probabilty(jws,:);
+              Fi_probabilty2(jws,:) = Fi_probabilty(jws,Hypo_matrix{r,k}(jws,:));
             end
             
             test=mat2cell([zeros(szzi,1) Fi_probabilty2]',(szzi+1),ones(1,szzi));
