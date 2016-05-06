@@ -1,4 +1,4 @@
-% close all
+close all
 clear all
 clc
 
@@ -8,7 +8,7 @@ rng(3);
 K= 20;                                 %number of frames
 T= 1;                                   %sampling period [s]
 OSPA.p = 2;OSPA.c = 25;OSPA.l = 25;
-Num_Exp=1; % number of monte carlo experiments
+Num_Exp=100; % number of monte carlo experiments
 
 
 u_image=30;v_image=30;
@@ -46,16 +46,28 @@ TPM_Option='Constant'; % TPM_Option='State-Dependent';
 TPM=1; % TPM{2,2}=1;TPM{2,1}=2*eye(2,2);TPM{1,2}=1;TPM{1,1}=0.5*eye(2,2);
 H_TPM=[0 1 0 0;0 0 0 1];
 
-Tracking_Scheme='JPDA';
 TN_H=[1 10:10:100]; % Threshold for considering maximum number of Hypotheses
+
+dist_lospa1_jpda = zeros(Num_Exp,K);
+loce_lospa1_jpda= zeros(Num_Exp,K);
+carde_lospa1_jpda= zeros(Num_Exp,K);
+
+dist_lospa1_jpda_ha = zeros(Num_Exp,K);
+loce_lospa1_jpda_ha= zeros(Num_Exp,K);
+carde_lospa1_jpda_ha= zeros(Num_Exp,K);
+
+dist_lospa1_ha = zeros(Num_Exp,K);
+loce_lospa1_ha= zeros(Num_Exp,K);
+carde_lospa1_ha= zeros(Num_Exp,K);
 
 dist_lospa1_LSTM = zeros(Num_Exp,K);
 loce_lospa1_LSTM= zeros(Num_Exp,K);
 carde_lospa1_LSTM= zeros(Num_Exp,K);
 
-dist_lospa1_m = zeros(Num_Exp,K);
-loce_lospa1_m= zeros(Num_Exp,K);
-carde_lospa1_m= zeros(Num_Exp,K);
+dist_lospa1_LSTM_ha = zeros(Num_Exp,K);
+loce_lospa1_LSTM_ha= zeros(Num_Exp,K);
+carde_lospa1_LSTM_ha= zeros(Num_Exp,K);
+
 
 
 JPDA_Er=cell(1,length(1:max(TN_H)));
@@ -71,7 +83,7 @@ TimeComp_3F=cell(Num_Exp,K);
 
 
 for NoE=1:Num_Exp
-%     close all
+    close all
     clc
     disp(['Experiment = ',num2str(NoE)])
 X= gen_state(F,Q0,X0,K);
@@ -150,9 +162,10 @@ xlabel('x-coordinate'),ylabel('y-coordinate')
 set(gca,'YTick',5:10:30),set(gca,'XTick',5:10:30),
 
 % print -dpsc 'Detections.eps'
-%% 1 Frame, m-Best assignment
+%% 1 Frame, JPDA
 % JPDA Parameters
 JPDA_multiscale=1; % Time-Frame windows
+Tracking_Scheme='JPDA';
 [XeT,~,~,~,Ff,Term_Con,~]=MULTISCAN_JPDA0(XYZ,F,Q,H,R,X0,P0,Tracking_Scheme,JPDA_P,TN_H(end),...
     JPDA_multiscale,PD,S_limit,mui0,TPM,TPM_Option,H_TPM);
 
@@ -175,38 +188,127 @@ figure,
     axis([Surv_region(1,:) Surv_region(2,:)])
 
 
-[dist_lospa1_m(NoE,:),loce_lospa1_m(NoE,:),carde_lospa1_m(NoE,:),~,~] = perf_asses(xy_GT,est_trk_j(1:2:3,:,:),OSPA,'No');
+[dist_lospa1_jpda(NoE,:),loce_lospa1_jpda(NoE,:),carde_lospa1_jpda(NoE,:),~,~] = perf_asses(xy_GT,est_trk_j(1:2:3,:,:),OSPA,'No');
+clear Xtrg Ytrg XeT Ff est_trk_j X_tr_j Fr_tr_j JPDA_multiscale N_H tStart
+%% 1 Frame, JPDA_HA
+% JPDA Parameters
+JPDA_multiscale=1; % Time-Frame windows
+Tracking_Scheme='JPDA_HA';
+[XeT,~,~,~,Ff,Term_Con,~]=MULTISCAN_JPDA0(XYZ,F,Q,H,R,X0,P0,Tracking_Scheme,JPDA_P,TN_H(end),...
+    JPDA_multiscale,PD,S_limit,mui0,TPM,TPM_Option,H_TPM);
 
-%% LSTM
-% JPDA_multiscale=1; % Time-Frame windows
-% [XeT,~,~,~,Ff,Term_Con,~]=MULTISCAN_JPDA0(XYZ,F,Q,H,R,X0,P0,'LSTM',JPDA_P,TN_H(end),...
-%     JPDA_multiscale,PD,S_limit,mui0,TPM,TPM_Option,H_TPM);
-% 
-% X_size=cellfun(@(x) size(x,2), XeT, 'UniformOutput', false);
-% Ff=cellfun(@(x,y,z) x(1):x(1)+y-1-z, Ff,X_size,Term_Con, 'ErrorHandler', @errorfun, ...
-%     'UniformOutput', false);
-% Ff_size=cellfun(@(x) size(x,2), Ff, 'UniformOutput', false);
-% XeT=cellfun(@(x,y) x(:,1:y),XeT,Ff_size, 'ErrorHandler', @errorfun, ...
-%     'UniformOutput', false);
-% 
-% [X_tr_j,Fr_tr_j,~,~]=Trajectory_Generator_Pruner_IMMJPDA(XeT,Ff,K,0);
-% [~,est_trk_j]=Track_Preprator(X_tr_j,Xdy,Fr_tr_j,Frdy,K);
-% 
-% figure,
-%     for nn=1:size(X_tr_j,2)
-%         plot(X_tr_j{nn}(1,:),X_tr_j{nn}(3,:),'s','Color',colorord(nn,:),'MarkerEdgeColor',colorord(nn,:),...
-%             'MarkerFaceColor',colorord(nn,:),'MarkerSize',4)
-%         hold on
-%     end
-%     axis([Surv_region(1,:) Surv_region(2,:)])
-% 
-% [dist_lospa1_LSTM(NoE,:),loce_lospa1_LSTM(NoE,:),carde_lospa1_LSTM(NoE,:),~,~] = perf_asses(xy_GT,est_trk_j(1:2:3,:,:),OSPA,'No');
-% 
-% 
-% clear Xtrg Ytrg XeT Ff est_trk_j X_tr_j Fr_tr_j JPDA_multiscale N_H tStart
+X_size=cellfun(@(x) size(x,2), XeT, 'UniformOutput', false);
+Ff=cellfun(@(x,y,z) x(1):x(1)+y-1-z, Ff,X_size,Term_Con, 'ErrorHandler', @errorfun, ...
+    'UniformOutput', false);
+Ff_size=cellfun(@(x) size(x,2), Ff, 'UniformOutput', false);
+XeT=cellfun(@(x,y) x(:,1:y),XeT,Ff_size, 'ErrorHandler', @errorfun, ...
+    'UniformOutput', false);
+
+[X_tr_j,Fr_tr_j,~,~]=Trajectory_Generator_Pruner_IMMJPDA(XeT,Ff,K,0);
+[~,est_trk_j]=Track_Preprator(X_tr_j,Xdy,Fr_tr_j,Frdy,K);
+
+figure,
+    for nn=1:size(X_tr_j,2)
+        plot(X_tr_j{nn}(1,:),X_tr_j{nn}(3,:),'s','Color',colorord(nn,:),'MarkerEdgeColor',colorord(nn,:),...
+            'MarkerFaceColor',colorord(nn,:),'MarkerSize',4)
+        hold on
+    end
+    axis([Surv_region(1,:) Surv_region(2,:)])
+
+
+[dist_lospa1_jpda_ha(NoE,:),loce_lospa1_jpda_ha(NoE,:),carde_lospa1_jpda_ha(NoE,:),~,~] = perf_asses(xy_GT,est_trk_j(1:2:3,:,:),OSPA,'No');
+clear Xtrg Ytrg XeT Ff est_trk_j X_tr_j Fr_tr_j JPDA_multiscale N_H tStart
+%% 1 Frame, HA
+% JPDA Parameters
+JPDA_multiscale=1; % Time-Frame windows
+Tracking_Scheme='HA';
+[XeT,~,~,~,Ff,Term_Con,~]=MULTISCAN_JPDA0(XYZ,F,Q,H,R,X0,P0,Tracking_Scheme,JPDA_P,TN_H(end),...
+    JPDA_multiscale,PD,S_limit,mui0,TPM,TPM_Option,H_TPM);
+
+X_size=cellfun(@(x) size(x,2), XeT, 'UniformOutput', false);
+Ff=cellfun(@(x,y,z) x(1):x(1)+y-1-z, Ff,X_size,Term_Con, 'ErrorHandler', @errorfun, ...
+    'UniformOutput', false);
+Ff_size=cellfun(@(x) size(x,2), Ff, 'UniformOutput', false);
+XeT=cellfun(@(x,y) x(:,1:y),XeT,Ff_size, 'ErrorHandler', @errorfun, ...
+    'UniformOutput', false);
+
+[X_tr_j,Fr_tr_j,~,~]=Trajectory_Generator_Pruner_IMMJPDA(XeT,Ff,K,0);
+[~,est_trk_j]=Track_Preprator(X_tr_j,Xdy,Fr_tr_j,Frdy,K);
+
+figure,
+    for nn=1:size(X_tr_j,2)
+        plot(X_tr_j{nn}(1,:),X_tr_j{nn}(3,:),'s','Color',colorord(nn,:),'MarkerEdgeColor',colorord(nn,:),...
+            'MarkerFaceColor',colorord(nn,:),'MarkerSize',4)
+        hold on
+    end
+    axis([Surv_region(1,:) Surv_region(2,:)])
+
+
+[dist_lospa1_ha(NoE,:),loce_lospa1_ha(NoE,:),carde_lospa1_ha(NoE,:),~,~] = perf_asses(xy_GT,est_trk_j(1:2:3,:,:),OSPA,'No');
+clear Xtrg Ytrg XeT Ff est_trk_j X_tr_j Fr_tr_j JPDA_multiscale N_H tStart
+%% 1 Frame, LSTM
+% JPDA Parameters
+JPDA_multiscale=1; % Time-Frame windows
+Tracking_Scheme='LSTM';
+[XeT,~,~,~,Ff,Term_Con,~]=MULTISCAN_JPDA0(XYZ,F,Q,H,R,X0,P0,Tracking_Scheme,JPDA_P,TN_H(end),...
+    JPDA_multiscale,PD,S_limit,mui0,TPM,TPM_Option,H_TPM);
+
+X_size=cellfun(@(x) size(x,2), XeT, 'UniformOutput', false);
+Ff=cellfun(@(x,y,z) x(1):x(1)+y-1-z, Ff,X_size,Term_Con, 'ErrorHandler', @errorfun, ...
+    'UniformOutput', false);
+Ff_size=cellfun(@(x) size(x,2), Ff, 'UniformOutput', false);
+XeT=cellfun(@(x,y) x(:,1:y),XeT,Ff_size, 'ErrorHandler', @errorfun, ...
+    'UniformOutput', false);
+
+[X_tr_j,Fr_tr_j,~,~]=Trajectory_Generator_Pruner_IMMJPDA(XeT,Ff,K,0);
+[~,est_trk_j]=Track_Preprator(X_tr_j,Xdy,Fr_tr_j,Frdy,K);
+
+figure,
+    for nn=1:size(X_tr_j,2)
+        plot(X_tr_j{nn}(1,:),X_tr_j{nn}(3,:),'s','Color',colorord(nn,:),'MarkerEdgeColor',colorord(nn,:),...
+            'MarkerFaceColor',colorord(nn,:),'MarkerSize',4)
+        hold on
+    end
+    axis([Surv_region(1,:) Surv_region(2,:)])
+
+
+[dist_lospa1_LSTM(NoE,:),loce_lospa1_LSTM(NoE,:),carde_lospa1_LSTM(NoE,:),~,~] = perf_asses(xy_GT,est_trk_j(1:2:3,:,:),OSPA,'No');
+clear Xtrg Ytrg XeT Ff est_trk_j X_tr_j Fr_tr_j JPDA_multiscale N_H tStart
+
+%% 1 Frame, LSTM_HA
+% JPDA Parameters
+JPDA_multiscale=1; % Time-Frame windows
+Tracking_Scheme='LSTM_HA';
+[XeT,~,~,~,Ff,Term_Con,~]=MULTISCAN_JPDA0(XYZ,F,Q,H,R,X0,P0,Tracking_Scheme,JPDA_P,TN_H(end),...
+    JPDA_multiscale,PD,S_limit,mui0,TPM,TPM_Option,H_TPM);
+
+X_size=cellfun(@(x) size(x,2), XeT, 'UniformOutput', false);
+Ff=cellfun(@(x,y,z) x(1):x(1)+y-1-z, Ff,X_size,Term_Con, 'ErrorHandler', @errorfun, ...
+    'UniformOutput', false);
+Ff_size=cellfun(@(x) size(x,2), Ff, 'UniformOutput', false);
+XeT=cellfun(@(x,y) x(:,1:y),XeT,Ff_size, 'ErrorHandler', @errorfun, ...
+    'UniformOutput', false);
+
+[X_tr_j,Fr_tr_j,~,~]=Trajectory_Generator_Pruner_IMMJPDA(XeT,Ff,K,0);
+[~,est_trk_j]=Track_Preprator(X_tr_j,Xdy,Fr_tr_j,Frdy,K);
+
+figure,
+    for nn=1:size(X_tr_j,2)
+        plot(X_tr_j{nn}(1,:),X_tr_j{nn}(3,:),'s','Color',colorord(nn,:),'MarkerEdgeColor',colorord(nn,:),...
+            'MarkerFaceColor',colorord(nn,:),'MarkerSize',4)
+        hold on
+    end
+    axis([Surv_region(1,:) Surv_region(2,:)])
+
+
+[dist_lospa1_LSTM_ha(NoE,:),loce_lospa1_LSTM_ha(NoE,:),carde_lospa1_LSTM_ha(NoE,:),~,~] = perf_asses(xy_GT,est_trk_j(1:2:3,:,:),OSPA,'No');
+clear Xtrg Ytrg XeT Ff est_trk_j X_tr_j Fr_tr_j JPDA_multiscale N_H tStart
 
 save('synthetic_results_new',...
-    'dist_lospa1_m','loce_lospa1_m','carde_lospa1_m',...
+    'dist_lospa1_jpda','loce_lospa1_jpda','carde_lospa1_jpda',...
+    'dist_lospa1_jpda_ha','loce_lospa1_jpda_ha','carde_lospa1_jpda_ha',...
+    'dist_lospa1_ha','loce_lospa1_ha','carde_lospa1_ha',...
+    'dist_lospa1_LSTM_ha','loce_lospa1_LSTM_ha','carde_lospa1_LSTM_ha',...
     'dist_lospa1_LSTM','loce_lospa1_LSTM','carde_lospa1_LSTM')
 
 end
