@@ -13,3 +13,5 @@ nngraph_*
 *.svg
 src/matlab/Matching/Cars_*
 src/matlab/parsearch/*
+src/matlab/tracking/Data*
+src/matlab/Data*

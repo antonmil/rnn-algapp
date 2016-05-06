@@ -1,9 +1,9 @@
-function [da, runtime] = LSTMDA(probs, marginals)
+function [da, runtime, daHun] = LSTMDA(probs, marginals)
 
 % probs = rand(5);
 
 N=size(probs,1);
-rnnSize = 32;
+rnnSize = 128;
 numLayers = 1;
 solIndex = 2; % 1=integer, 2=distribution
 infIndex = 2; % 1=map, 2=marginal
@@ -35,3 +35,4 @@ runtime = resRaw(1,3);
 da = resRaw(:,2);
 da = reshape(da, N, N)';
 
+[daHun, ~] = hungarian(-log(da));
