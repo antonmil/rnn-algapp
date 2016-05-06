@@ -148,28 +148,33 @@ for f=2:Frame
             Mes_Tar(:,:,r)=[false(Vmt,Vmt+Umt);Mes_Tar2(:,:,r) false(Umt,Umt)];
             % Final_probabilty{1,r}(1,exist_ind) =JPDA_Probabilities(Mes_Tar(:,:,r),Target_Obs_indx(exist_ind,r)',Target_probabilty(exist_ind,r)');
             % Final_probabilty{1,r}(1,exist_ind) =Multiscan_JPDA_Probabilities(Mes_Tar(:,:,r),Target_Obs_indx(exist_ind,r)',Target_probabilty(exist_ind,r)');
-            Final_probabilty{1,r}(1,exist_ind) =Approx_Multiscan_JPDA_Probabilities(Mes_Tar(:,:,r),Rt_In_Pr(exist_ind,r),mbest);
-            GT_marginals = cell2mat(Final_probabilty{1,r})';
-            if ~all(GT_marginals(:,1)==0)
-                error('missed detection marginal is not zero')
-            end
-            GT_marginals=GT_marginals(:,2:end);
-            for jws=1:size(GT_marginals,1)
-                GT_marginals(jws,Hypo_matrix{r,k}(jws,:)) = GT_marginals(jws,:);
-            end
-%             simty=Assign_matrix{r,k};
-%             mar=GT_marginals;
-%             save('tmp.mat','simty','mar');
-%             pause
+%             Final_probabilty{1,r}(1,exist_ind) =Approx_Multiscan_JPDA_Probabilities(Mes_Tar(:,:,r),Rt_In_Pr(exist_ind,r),mbest);
+%             GT_marginals = cell2mat(Final_probabilty{1,r})';
+%             if ~all(GT_marginals(:,1)==0)
+%                 error('missed detection marginal is not zero')
+%             end
+%             GT_marginals=GT_marginals(:,2:end);
+%             for jws=1:size(GT_marginals,1)
+%                 GT_marginals(jws,Hypo_matrix{r,k}(jws,:)) = GT_marginals(jws,:);
+%             end
+% 
+%             [HA,~] = hungarian(-log(GT_marginals));
 
-            Fi_probabilty=LSTMDA(Assign_matrix{r,k},GT_marginals);
+%             [Fi_probabilty, runt, HA]=LSTMDA(Assign_matrix{r,k},GT_marginals);
+
+            [Fi_probabilty, runt, HA]=LSTMDA(Assign_matrix{r,k});
+%             [HA,~] = hungarian(-log(Assign_matrix{r,k}));
+            HA
             Fi_probabilty2=Fi_probabilty;
+            Fi_probabilty=HA;
+            Fi_probabilty2=HA;
             szzi= size(Fi_probabilty,2);
             for jws=1:szzi
               Fi_probabilty2(jws,:) = Fi_probabilty(jws,Hypo_matrix{r,k}(jws,:));
             end
+
             
-            test=mat2cell([zeros(szzi,1) Fi_probabilty2]',(szzi+1),ones(1,szzi));
+            Final_probabilty{1,r}=mat2cell([zeros(szzi,1) Fi_probabilty2]',(szzi+1),ones(1,szzi));
             
 
     end
