@@ -220,21 +220,21 @@ if opt.inference == 'marginal' then
   solTable =  findFeasibleSolutions(opt.max_n, opt.max_m) -- get feasible solutions
 end
 
-print(TrCostTab)
-local testSmty=torch.Tensor({
-1.04499,2.81213e-10,2.27526e-27,1.49123e-50,6.37314e-93,4.7103e-08,0.641257,1.71426e-07,6.64567e-21,3.17428e-50,1.4591e-28,0.000100491,0.887605,0.000203532,1.08651e-20,3.10612e-62,1.08224e-21,3.15837e-07,0.428377,0.000255579,4.54414e-109,8.00968e-52,7.72332e-27,6.19609e-11,0.413155
-})
-
-testSmty[testSmty:eq(0)]=0.00001
-testSmty=testSmty:reshape(1,25):repeatTensor(10,1)
-local testCost={}
-table.insert(testCost, testSmty)
-printMatrix(testCost[1][1]:reshape(5,5))
-print('')
-local testSol=computeMarginals(testCost)
-printMatrix(testSol[1][1]:reshape(5,5))
-abort()
---  
+--print(TrCostTab)
+--local testSmty=torch.Tensor({
+--1.04499,2.81213e-10,2.27526e-27,1.49123e-50,6.37314e-93,4.7103e-08,0.641257,1.71426e-07,6.64567e-21,3.17428e-50,1.4591e-28,0.000100491,0.887605,0.000203532,1.08651e-20,3.10612e-62,1.08224e-21,3.15837e-07,0.428377,0.000255579,4.54414e-109,8.00968e-52,7.72332e-27,6.19609e-11,0.413155
+--})
+--
+--testSmty[testSmty:eq(0)]=0.00001
+--testSmty=testSmty:reshape(1,25):repeatTensor(10,1)
+--local testCost={}
+--table.insert(testCost, testSmty)
+--printMatrix(testCost[1][1]:reshape(5,5))
+--print('')
+--local testSol=computeMarginals(testCost)
+--printMatrix(testSol[1][1]:reshape(5,5))
+--abort()
+----  
 
 
 --local mBst = 1
@@ -854,7 +854,7 @@ for i = 1, opt.max_epochs do
     -- save debug plots
     local _,_,modelName,modelSign = getCheckptFilename(modelName, opt, modelParams)
     local outDir = string.format('%stmp/%s_%s',getRootDir(),modelName, modelSign)
-    local savefile = string.format("%s/plot_data.t7\"",outDir)
+    local savefile = string.format("%s/plot_data.t7",outDir)
     local plotdata = {}
     plotdata.plot_energies = plot_energies
     plotdata.plot_val_energies = plot_val_energies
@@ -866,6 +866,7 @@ for i = 1, opt.max_epochs do
     plotdata.plot_train_mm = plot_train_mm
     plotdata.plot_val_mm_x = plot_val_mm_x
     plotdata.plot_val_mm = plot_val_mm
+    plotdata.opt = opt
     torch.save(savefile, plotdata)
 
 

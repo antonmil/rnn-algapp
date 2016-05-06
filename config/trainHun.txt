@@ -1,10 +1,10 @@
           model_index  1
              rnn_size  32
            num_layers  2
-                max_n  5
-                order  1
-            inf_index  2
-            sol_index  2
+                max_n  8
+                order  2
+            inf_index  1
+            sol_index  1
                sparse  0
          invert_input  0
          double_input  0
@@ -12,8 +12,8 @@
              exp_cost  1
            supervised  1
          grad_replace  0
-    diverse_solutions  0
-                 mbst  1
+    diverse_solutions  1
+                 mbst  10
         project_valid  0
             state_dim  4
            batch_size  1
@@ -25,9 +25,9 @@
                
             init_from  
         training_file  
-           max_epochs  500000
+           max_epochs  50000
       mini_batch_size  10
-       synth_training  100
+       synth_training  1000
           synth_valid  10
              full_set  0
 
