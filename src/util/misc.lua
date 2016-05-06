@@ -742,16 +742,25 @@ function hungarianL(mat)
   
   local matTab = mat:clone():totable()
 --   local timer = torch.Timer()
-  local ass = hungarian(matTab)
-  local retTen = torch.ones(tabLen(ass),2)
-
-  local cnt=0
-  for k,v in pairs(ass) do
-    cnt=cnt+1
-    retTen[cnt][1] = k
-    retTen[cnt][2] = v
+--  local ass = hungarian(matTab)
+  local retTen = torch.ones(mat:size(1),2)
+  local status, ass = pcall(hungarian(matTab))
+  if not status then    
+    for k=1,mat:size(1) do
+      retTen[k][1] = k
+      retTen[k][2] = k
+    end
+  else
+  
+--    local retTen = torch.ones(tabLen(ass),2)
+  
+    local cnt=0
+    for k,v in pairs(ass) do
+      cnt=cnt+1
+      retTen[cnt][1] = k
+      retTen[cnt][2] = v
+    end
   end
-
   return retTen
 
 end      

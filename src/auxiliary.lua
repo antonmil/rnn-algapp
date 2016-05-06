@@ -106,10 +106,12 @@ function getOneCost(seed)
 
   local oneCost = torch.rand(opt.mini_batch_size*opt.max_n, opt.max_m)
   
-  local randN = math.random(5)
+  local randN = math.random(10)
 --  randN=5
   local randProb = torch.rand(opt.mini_batch_size, opt.max_n * opt.max_m)
   local oneCost = torch.pow(torch.abs(randProb ),randN)
+  
+  
 --  for mb=1,opt.mini_batch_size do
 --    local mat = torch.zeros(opt.max_n, opt.max_m)
 --    for n=1,opt.max_n do
@@ -635,7 +637,7 @@ function computeMarginals(CostTab)
         marginals[idx] = marginals[idx] + hypCost   -- add to joint matrix
         --          print(torch.sum(marginals))
         --        print(permCnt)
-        --        print(marginals)
+--                print(marginals)
         --        sleep(1)
         --        if permCnt>=4 then break end
 
@@ -853,43 +855,6 @@ function findFeasibleSolutions(N,M)
   return solTable
 
 end
-
---function findFeasibleSolutions2(N,M)
---  --  local assFile = 'tmp/ass_n'..N..'_m'..M..'.t7'
---
---  pm('Generating feasible solutions table...')
---  local feasSol, infSol = {}, {}
---  local possibleAssignments = math.pow(2,N*M)
---
---  for s=1,possibleAssignments do
---
---    local binCode = torch.Tensor(toBits(s, N*M))
---    local ass = binCode:reshape(N,M)
---    local feasible = true
---    local sumAllEntries = torch.sum(binCode)
---    if sumAllEntries ~= N then goto continue end
---
---    local sumOverColumns = torch.sum(ass,2)
---    if torch.sum(sumOverColumns:ne(1)) > 0 then goto continue end
---
---    local sumOverRows = torch.sum(ass,1)
---    if torch.sum(sumOverRows:ne(1)) > 0 then goto continue end
---
---
---    table.insert(feasSol, ass)
---
---    --    print(s)
---    ::continue::
---  end
---  solTable = {}
---  solTable.feasSol = feasSol
---  solTable.infSol = infSol
---  --      torch.save(assFile, solTable)
---
---  pm('... done')
---  return solTable
---
---end
 
 --------------------------------------------------------------------------
 --- get all inputs for one time step

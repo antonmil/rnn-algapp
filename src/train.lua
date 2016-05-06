@@ -219,8 +219,22 @@ solTable = nil
 if opt.inference == 'marginal' then
   solTable =  findFeasibleSolutions(opt.max_n, opt.max_m) -- get feasible solutions
 end
-  
 
+--print(TrCostTab)
+local testSmty=torch.Tensor({
+1.04499,2.81213e-10,2.27526e-27,1.49123e-50,6.37314e-93,1.71426e-07,4.7103e-08,0.641257,6.64567e-21,3.17428e-50,0.000100491,1.08651e-20,0.000203532,1.4591e-28,0.887605,1.08224e-21,3.10612e-62,3.15837e-07,0.000255579,0.428377,4.54414e-109,8.00968e-52,7.72332e-27,6.19609e-11,0.413155,
+})
+
+testSmty[testSmty:eq(0)]=0.00001
+testSmty=testSmty:reshape(1,25):repeatTensor(10,1)
+local testCost={}
+table.insert(testCost, testSmty)
+printMatrix(testCost[1][1]:reshape(5,5))
+print('')
+local testSol=computeMarginals(testCost)
+printMatrix(testSol[1][1]:reshape(5,5))
+abort()
+  
 
 
 --local mBst = 1
@@ -228,6 +242,7 @@ end
 --print(cmdstr)
 --os.execute(cmdstr)
 getData(opt, true, true)
+
 
 
 --print(TrCostTab[1])
@@ -782,8 +797,9 @@ for i = 1, opt.max_epochs do
 
     table.insert(lossPlotTab, {"Trng O-proj",plot_loss_x,plot_energies_proj/en_norm, 'with linespoints lt 7'})
     table.insert(lossPlotTab, {"Vald O-proj",plot_val_loss_x, plot_val_energies_proj/en_norm, 'with linespoints lt 8'})
-    
-    table.insert(lossPlotTab, {"% better pred",plot_loss_x, plot_gt_replaced, 'with lines lt 9'})
+    if opt.grad_replace ~= 0 then
+      table.insert(lossPlotTab, {"% better pred",plot_loss_x, plot_gt_replaced, 'with lines lt 9'})
+    end
     
     --  local minInd = math.min(1,plot_loss:nElement())
 --    local maxY = math.max(torch.max(plot_loss), torch.max(plot_val_loss), torch.max(plot_real_loss),
@@ -799,7 +815,7 @@ for i = 1, opt.max_epochs do
       table.insert(lossPlotTab, {"Trng loss",plot_loss_x,plot_loss, 'with linespoints lt 1'})
       table.insert(lossPlotTab, {"Vald loss",plot_val_loss_x, plot_val_loss, 'with linespoints lt 3'})
       minY, maxY = minMax(plot_train_mm, plot_val_mm, plot_loss, plot_val_loss, 
-        plot_energies_proj/en_norm, plot_val_energies_proj/en_norm,  plot_gt_replaced)
+        plot_energies_proj/en_norm, plot_val_energies_proj/en_norm)
     end
 
 --    minY = math.max(0.001, minY/2)

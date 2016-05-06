@@ -119,3 +119,14 @@ function printAll(tr, det, lab, ex, detex)
   
   print('-------------------------------')
 end
+
+function printMatrix(mat)
+  local N,M = mat:size(1), mat:size(2)
+  for i=1,N do
+    local prLine = ''
+    for j=1,M do
+      prLine = prLine ..  string.format('%5.2f',mat[i][j])
+    end
+    print(prLine)
+  end
+end

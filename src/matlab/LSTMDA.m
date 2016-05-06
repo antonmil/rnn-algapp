@@ -3,7 +3,7 @@ function [da, runtime] = LSTMDA(probs, marginals)
 % probs = rand(5);
 
 N=size(probs,1);
-rnnSize = 128;
+rnnSize = 32;
 numLayers = 1;
 solIndex = 2; % 1=integer, 2=distribution
 infIndex = 2; % 1=map, 2=marginal
@@ -12,7 +12,7 @@ model_name = 'trainHun';
 
 allQ=reshape(probs', 1, N*N);
 allSol=reshape(eye(N), 1, N*N);
-if nargin==2, allSol=marginals; end
+if nargin==2, allSol=reshape(marginals',1,  N*N); end
 allMarginals=allSol;
 
 testfilebase='da';

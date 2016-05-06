@@ -140,6 +140,7 @@ for f=2:Frame
     Final_probabilty=cell(1,Kt);
     Mes_Tar2=Mes_Tar(:,exist_ind,:);[Umt, Vmt, Zmt]=size(Mes_Tar2);
     Mes_Tar=false(Vmt+Umt,Vmt+Umt,Zmt);
+
     for r=1:Kt
         Final_probabilty{1,r}=cell(1,N_Target);
             Mes_Tar(:,:,r)=[false(Vmt,Vmt+Umt);Mes_Tar2(:,:,r) false(Umt,Umt)];
@@ -152,8 +153,13 @@ for f=2:Frame
             end
             GT_marginals=GT_marginals(:,2:end);
             for jws=1:size(GT_marginals,1)
-            GT_marginals(jws,Hypo_matrix{r,k}(jws,:)) = GT_marginals(jws,:);
+                GT_marginals(jws,Hypo_matrix{r,k}(jws,:)) = GT_marginals(jws,:);
             end
+%             simty=Assign_matrix{r,k};
+%             mar=GT_marginals;
+%             save('tmp.mat','simty','mar');
+%             pause
+
             Fi_probabilty=LSTMDA(Assign_matrix{r,k},GT_marginals);
             Fi_probabilty2=Fi_probabilty;
             szzi= size(Fi_probabilty,2);

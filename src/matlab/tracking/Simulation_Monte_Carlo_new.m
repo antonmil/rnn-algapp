@@ -4,6 +4,7 @@ clc
 
 addpath(fullfile([pwd,filesep,'L-OSPA']))
 
+rng(1);
 K= 20;                                 %number of frames
 T= 1;                                   %sampling period [s]
 OSPA.p = 2;OSPA.c = 25;OSPA.l = 25;
