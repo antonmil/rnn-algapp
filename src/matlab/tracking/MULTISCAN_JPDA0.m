@@ -130,8 +130,10 @@ for f=2:Frame
                 Lambda{1,no}(r2,k)=sum(Target_probabilty{no,r2}{1}{1});
                 
             end
-            Hypo_matrix{r2,k} = [Hypo_matrix{r2,k};Rt_In_Pr{no,r2}.Hypo(2:end)']; 
-            assm_pr = Rt_In_Pr{no,r2}.Prob(Rt_In_Pr{no,r2}.Hypo(2:end)+1)';
+            Hypo_matrix{r2,k} = [Hypo_matrix{r2,k};Rt_In_Pr{no,r2}.Hypo(2:end)'];
+            tr_prob = Rt_In_Pr{no,r2}.Prob(2:end);
+            assm_pr=tr_prob';
+            assm_pr(Rt_In_Pr{no,r2}.Hypo(2:end)) = tr_prob';
             Assign_matrix{r2,k} = [Assign_matrix{r2,k};assm_pr];
         end
     end
