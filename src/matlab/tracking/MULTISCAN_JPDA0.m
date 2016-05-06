@@ -169,7 +169,7 @@ for f=2:Frame
               Fi_probabilty2(jws,Hypo_matrix{r,k}(jws,:)) = Fi_probabilty(jws,:);
             end
             
-%             Final_probabilty{1,r}=mat2cell([zeros(szzi,1) Fi_probabilty2]',(szzi+1),ones(1,szzi));
+            test=mat2cell([zeros(szzi,1) Fi_probabilty2]',(szzi+1),ones(1,szzi));
             
 
     end

@@ -339,15 +339,17 @@ function readQBPData(ttmode, testfile, readnth)
         table.insert(allDataFiles, ff)
       end
     end
-    if allDataFiles == {} then error('no data found') end
+    
+    if #allDataFiles == 0 then error('no data found') end
     readnth = math.min(readnth, #allDataFiles)
-    Qfile = allDataFiles[readnth]
+    Qfile = allDataFiles[readnth]    
   end
   
 --  local Qfile = string.format('%s/QBP-%s_m%d_N%d_M%d.mat', 
 --        dataDir, opt.inference,opt.mbst,opt.max_n, opt.max_m);
 
 --  local Qfile = string.format('%sdata/%s/QBP_N%d_M%d.mat',getRootDir(), ttmode, opt.max_n, opt.max_m);
+  print()
   checkFileExist(Qfile,'Q cost file')
   local loaded = mattorch.load(Qfile)
   pm('Loaded data file '..Qfile)

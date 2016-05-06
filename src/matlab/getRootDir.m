@@ -1,3 +1,3 @@
 function rootDir = getRootDir
-    rootDir = '/home/amilan/research/projects/rnn-algapp/';
+    rootDir = '~/research/projects/rnn-algapp/';
 end
