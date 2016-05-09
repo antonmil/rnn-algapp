@@ -3,7 +3,7 @@ clear all
 clc
 
 addpath(fullfile([pwd,filesep,'L-OSPA']))
-
+addpath(genpath('../Matching'))
 rng(321);
 K= 20;                                 %number of frames
 T= 1;                                   %sampling period [s]
@@ -84,7 +84,7 @@ TimeComp_3F=cell(Num_Exp,K);
 
 for NoE=1:Num_Exp
     close all
-    clc
+%     clc
     disp(['Experiment = ',num2str(NoE)])
 X= gen_state(F,Q0,X0,K);
 N_T=max(cellfun(@(x) size(x,2),X));
@@ -319,7 +319,7 @@ for m=1:length(mnames)
     mname = char(mnames(m));
     methErrors = zeros(1,3);
     for e=1:3
-        eval(sprintf('thisError = mean(mean(%s_lospa1_%s));',char(errors(e)),mname));
+        eval(sprintf('thisError = mean(%s_lospa1_%s(NoE,:));',char(errors(e)),mname));
         methErrors(e) = thisError;
     end
     fprintf('%10s|%10.2f|%10.2f|%10.2f|\n',mname,methErrors(1), methErrors(2),methErrors(3));
@@ -337,7 +337,7 @@ for m=1:length(mnames)
     mname = char(mnames(m));
     methErrors = zeros(1,3);
     for e=1:3
-        eval(sprintf('thisError = mean(%s_lospa1_%s(NoE,:));',char(errors(e)),mname));
+        eval(sprintf('thisError = mean(mean(%s_lospa1_%s(1:NoE,:)));',char(errors(e)),mname));
         methErrors(e) = thisError;
     end
     fprintf('%10s|%10.2f|%10.2f|%10.2f|\n',mname,methErrors(1), methErrors(2),methErrors(3));
@@ -346,9 +346,31 @@ end
 pause(.5)
 end
 
+%% export to latex
+doExport=false;
+doExport=true;
+N=5;
+if doExport
+    fil = fopen(sprintf('%s/numbers/da-N%d.tex',getPaperDir,N),'w');
+    fprintf(fil,'Method &');
+    for m=1:length(mnames)
+        mname = char(mnames(m));
+        fprintf(fil,'%10s',upper(strrep(mname,'_','\_')));
+        if m<length(mnames), fprintf(fil,'&'); end
 
+    end
 
-
+    fprintf(fil,'\\\\ \n \\midrule \n');
+    fprintf(fil,'Tracking error &');
+    for m=1:length(mnames)
+        mname = char(mnames(m));
+        eval(sprintf('thisError = mean(mean(%s_lospa1_%s(1:NoE,:)));',char(errors(1)),mname));
+        fprintf(fil,'%10.2f',thisError);
+        if m<length(mnames), fprintf(fil,'&'); end       
+    end
+    fprintf(fil,'\n');
+    fclose(fil);
+end
 
 
 

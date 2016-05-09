@@ -1,5 +1,5 @@
           model_index  1
-             rnn_size  32
+             rnn_size  128
            num_layers  1
                 max_n  5
                 order  1
@@ -7,11 +7,11 @@
             sol_index  2
                sparse  0
          invert_input  0
-         double_input  1
+         double_input  0
            full_input  1
              exp_cost  1
            supervised  1
-         grad_replace  0
+         grad_replace  1
     diverse_solutions  0
                  mbst  1
         project_valid  0
@@ -22,13 +22,13 @@
                   vel  0
               fixed_n  1
                lambda  1
-                   mu  10
+                   mu  0
                
             init_from  
         training_file  
            max_epochs  50000
       mini_batch_size  10
-       synth_training  1000
+       synth_training  10000
           synth_valid  10
              full_set  0
 

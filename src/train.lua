@@ -426,10 +426,13 @@ function feval()
   predMeanEnergy, GTMeanEnergy = 0,0
   predMeanEnergyProj, GTMeanEnergyProj = 0,0
     
-  local mv, mi = torch.max(predDA,3)
-  local sol = getOneHotLab2(mi, true, opt.max_n)
-
   
+  local sol = torch.exp(predDA)
+	if opt.inference == 'map' then 
+		local mv, mi = torch.max(predDA,3)
+		sol = getOneHotLab2(mi, true, opt.max_n) 
+	end
+
   local predConstr = evalBatchConstraints(sol)
 --  print(predConstr)
   sol = sol:reshape(opt.mini_batch_size, opt.max_n*opt.nClasses, 1) -- make batches of column vectors
@@ -444,11 +447,15 @@ function feval()
   
   -- get ground truth energy
   local hOneHot = huns:clone()
-  if opt.solution == 'distribution' then _,hOneHot = hOneHot:reshape(opt.mini_batch_size, opt.max_n, opt.max_m):max(3) end -- make integer (from max)
+  
 --  if opt.solution == 'integer' then hOneHot =  getOneHotLab2(huns, opt.mini_batch_size>1, opt.nClasses) end
-  hOneHot =  getOneHotLab2(hOneHot, opt.mini_batch_size>1, opt.nClasses) -- make binary solutions
---  print(hOneHot)
---  abort()
+  
+	if opt.inference == 'map' then 
+		if opt.solution == 'distribution' then _,hOneHot = hOneHot:reshape(opt.mini_batch_size, opt.max_n, opt.max_m):max(3) end -- make integer (from max)
+		hOneHot =  getOneHotLab2(hOneHot, opt.mini_batch_size>1, opt.nClasses) -- make binary solutions
+	end
+	-- print(hOneHot)
+	-- abort()
   
 
   local GTConstr = evalBatchConstraints(hOneHot:reshape(opt.mini_batch_size, opt.max_n, opt.max_m))
@@ -817,6 +824,11 @@ for i = 1, opt.max_epochs do
       table.insert(lossPlotTab, {"Vald loss",plot_val_loss_x, plot_val_loss, 'with linespoints lt 3'})
       minY, maxY = minMax(plot_train_mm, plot_val_mm, plot_loss, plot_val_loss, 
         plot_energies_proj/en_norm, plot_val_energies_proj/en_norm)
+				if opt.grad_replace ~= 0 then
+					minY, maxY = minMax(plot_train_mm, plot_val_mm, plot_loss, plot_val_loss, 
+						plot_energies_proj/en_norm, plot_val_energies_proj/en_norm, plot_gt_replaced)
+				
+				end
     end
 
 --    minY = math.max(0.001, minY/2)
