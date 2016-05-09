@@ -1,6 +1,6 @@
-function [XeT,PeT,Xe,Pe,Ff,Term_Con,mui]=MULTISCAN_JPDA0(XYZ,F,Q,H,R,X0,P0,Tracking_Scheme,JPDA_P,mbest,...
-    JPDA_multiscale,Min_PD,S_limit,mu0i,TPM,TPM_Option,H_TPM)
-if nargin~=17
+function [XeT,PeT,Xe,Pe,Ff,Term_Con,mui]=MULTISCAN_JPDA0_train(XYZ,F,Q,H,R,X0,P0,Tracking_Scheme,JPDA_P,mbest,...
+    JPDA_multiscale,Min_PD,S_limit,mu0i,TPM,TPM_Option,H_TPM,exp_n)
+if nargin~=18
     error('Not enough inputs. Please check your inputs')
 end
 
@@ -150,8 +150,10 @@ for f=2:Frame
             Final_probabilty{1,r}(1,exist_ind) =Approx_Multiscan_JPDA_Probabilities(Mes_Tar(:,:,r),Rt_In_Pr(exist_ind,r),mbest);
         elseif strcmp(Tracking_Scheme,'JPDA_fst')||strcmp(Tracking_Scheme,'JPDA_HA')
             Fi_probabilty = Efficient_JPDA(Assign_matrix{r,k});
+            Assign_matrixx=Assign_matrix{r,k}; %#ok<NASGU>
             Fi_probabilty = Fi_probabilty./repmat(sum(Fi_probabilty,2),[1 size(Fi_probabilty,2)]);
             Fi_probabilty2=Fi_probabilty;
+            save([pwd,filesep,'Training_assignment_matrix',filesep,'Data_tr_Exp',num2str(exp_n),'_Fr_',num2str(k)],'Assign_matrixx','Fi_probabilty')
             if strcmp(Tracking_Scheme,'JPDA_HA')
                 [HA,~] = Hungarian(-log(Fi_probabilty));
             end
