@@ -44,6 +44,7 @@ H_TPM=[0 1 0 0;0 0 0 1];
 
 % assert that data folder exists
 if ~exist('Training_assignment_matrix', 'dir'), mkdir('Training_assignment_matrix'); end
+if ~exist('Data', 'dir'), mkdir('Data'); end
 
 tic
 for NoE=1:Num_Exp
