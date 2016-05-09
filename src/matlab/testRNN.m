@@ -1,5 +1,6 @@
 %%
-addpath(genpath('.'))
+addpath('.')
+addpath('./Matching/')
 nRuns = 1:10;
 
 
@@ -19,6 +20,7 @@ model_sign = sprintf('mt1_r%d_l%d_n%d_m%d_o2_s%d_i%d_valen',rnnSize, numLayers, 
 model_name = 'trainHun';
 model_name = '0502Fs-2'; % GOOD ONE (also 0502Fs-1)
 model_name = '0505As-2'; %
+model_name = '0509QAy-3'; %
 
 mBst = 10;
 doRandomize = true;

@@ -3,12 +3,13 @@ function [da, runtime, daHun] = LSTMDA(probs, marginals)
 % probs = rand(5);
 
 N=size(probs,1);
-rnnSize = 32;
+rnnSize = 128;
 numLayers = 1;
 solIndex = 2; % 1=integer, 2=distribution
 infIndex = 2; % 1=map, 2=marginal
 model_sign = sprintf('mt1_r%d_l%d_n%d_m%d_o1_s%d_i%d_valen',rnnSize, numLayers, N,N, solIndex, infIndex);
 model_name = 'trainHun';
+model_name = '0509LBc-2';
 
 allQ=reshape(probs', 1, N*N);
 allSol=reshape(eye(N), 1, N*N);
@@ -23,7 +24,7 @@ try
     cmd = sprintf('cd ../..; pwd; th %s.lua -model_name %s -model_sign %s -suppress_x 1 -test_file %s','test', ...
         model_name , model_sign, testfilebase);
     [a,b] = system(cmd);
-    b
+%     b
     if a~=0, fprintf('Error running RNN!\n'); end
 catch err
     fprintf('WARNING. LSTM IGNORED. %s\n',err.message);
