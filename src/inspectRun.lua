@@ -2,7 +2,7 @@ require 'lfs'
 require 'util.misc'
 require 'gnuplot'
 -- project specific auxiliary functions
-require 'aux'
+require 'auxiliary'
 
 cmd = torch.CmdLine()
 cmd:text()
@@ -87,7 +87,10 @@ for k,v in pairs(parRanges) do
   if logsp ~= 0 then
 	prange = torch.exp(torch.linspace(torch.log(from), torch.log(to), n))
   end
-  local pstep = prange[2] - prange[1]
+  local pstep = 1
+  if from~=to then
+  	pstep = prange[2] - prange[1]
+  end
   
   for exper=1,n do
     local modelName = opt.main_name..subexper..'-'..exper
@@ -117,7 +120,7 @@ for k,v in pairs(parRanges) do
   end
   
 --   local tmpDir = 
-  print(subexper, pname, from, to, n)
+  
   
 --   sleep(1)
   
@@ -137,6 +140,9 @@ for k,v in pairs(parRanges) do
     local mainpar = opt[pname] -- default parameter
     local mpX = torch.Tensor({mainpar, mainpar})
     local mpY = torch.Tensor({torch.min(amTen)-1, torch.max(amTen)+1})
+    
+    print(string.format('%s%s (%s): %g - %g (default: %g)',opt.main_name,subexper,pname,from,to,mainpar))
+--     print(subexper, pname, from, to, n, mainpar)
     
     local plotTab = {}
     
