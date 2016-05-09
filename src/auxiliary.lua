@@ -786,8 +786,10 @@ end
 
 
 function prepData(tab)
-  pm('normalizing...')
-  tab = normalizeCost(tab)
+  if opt.normalize ~= 0 then
+    pm('normalizing...')
+    tab = normalizeCost(tab)
+  end
 
 
 

@@ -57,6 +57,7 @@ cmd:option('-supervised',1,'Supervised or unsupervised learning')
 cmd:option('-grad_replace',1,'Replace better predictions with 0 gradient')
 cmd:option('-diverse_solutions',1,'take an improved m-bst solution iteratively')
 cmd:option('-mbst',0,'how many diverse solutions to consider?')
+cmd:option('-normalize',1,'Normalize data to [0,1]?')
 -- optimization
 cmd:option('-lrng_rate',1e-2,'learning rate')
 cmd:option('-lrng_rate_decay',0.99,'learning rate decay')

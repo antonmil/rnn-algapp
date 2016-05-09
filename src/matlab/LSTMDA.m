@@ -3,7 +3,7 @@ function [da, runtime, daHun] = LSTMDA(probs, marginals)
 % probs = rand(5);
 
 N=size(probs,1);
-rnnSize = 128;
+rnnSize = 32;
 numLayers = 1;
 solIndex = 2; % 1=integer, 2=distribution
 infIndex = 2; % 1=map, 2=marginal

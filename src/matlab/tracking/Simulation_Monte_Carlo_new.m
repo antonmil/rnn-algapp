@@ -4,11 +4,11 @@ clc
 
 addpath(fullfile([pwd,filesep,'L-OSPA']))
 
-rng(3);
+rng(321);
 K= 20;                                 %number of frames
 T= 1;                                   %sampling period [s]
 OSPA.p = 2;OSPA.c = 25;OSPA.l = 25;
-Num_Exp=100; % number of monte carlo experiments
+Num_Exp=10; % number of monte carlo experiments
 
 
 u_image=30;v_image=30;
@@ -311,12 +311,40 @@ save('synthetic_results_new',...
     'dist_lospa1_LSTM_ha','loce_lospa1_LSTM_ha','carde_lospa1_LSTM_ha',...
     'dist_lospa1_LSTM','loce_lospa1_LSTM','carde_lospa1_LSTM')
 
+%%
+mnames = {'jpda','jpda_ha','ha','LSTM_ha','LSTM'};
+errors = {'dist','loce','carde'};
+fprintf('\nExperiment %d\n%10s|%10s|%10s|%10s|\n--------------------------------------------\n',NoE,'Method','Dist','Loce','Carde');
+for m=1:length(mnames)
+    mname = char(mnames(m));
+    methErrors = zeros(1,3);
+    for e=1:3
+        eval(sprintf('thisError = mean(mean(%s_lospa1_%s));',char(errors(e)),mname));
+        methErrors(e) = thisError;
+    end
+    fprintf('%10s|%10.2f|%10.2f|%10.2f|\n',mname,methErrors(1), methErrors(2),methErrors(3));
 end
 
 
 
 
 
+%% Mean over all MC runs
+mnames = {'jpda','jpda_ha','ha','LSTM_ha','LSTM'};
+errors = {'dist','loce','carde'};
+fprintf('\nOverall Mean\n%10s|%10s|%10s|%10s|\n--------------------------------------------\n','Method','Dist','Loce','Carde');
+for m=1:length(mnames)
+    mname = char(mnames(m));
+    methErrors = zeros(1,3);
+    for e=1:3
+        eval(sprintf('thisError = mean(%s_lospa1_%s(NoE,:));',char(errors(e)),mname));
+        methErrors(e) = thisError;
+    end
+    fprintf('%10s|%10.2f|%10.2f|%10.2f|\n',mname,methErrors(1), methErrors(2),methErrors(3));
+end
+
+pause(.5)
+end
 
 
 
