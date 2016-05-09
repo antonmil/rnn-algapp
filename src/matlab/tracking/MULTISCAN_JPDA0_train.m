@@ -4,7 +4,7 @@ if nargin~=18
     error('Not enough inputs. Please check your inputs')
 end
 
-hwait = waitbar(0,'Background Extraction');
+% hwait = waitbar(0,'Background Extraction');
 elapsedTime=inf;
 
 
@@ -79,7 +79,7 @@ Terminated_objects_index=[];
 Assign_matrix = cell(Kt,Frame);
 Hypo_matrix = cell(Kt,Frame);
 %************************ Kalman Filter Tracking **************************
-waitbar((1)/(Frame),hwait,['Frame # ',num2str(1),'   Estimated time: ',num2str((Frame-1)*elapsedTime),' s'])
+% waitbar((1)/(Frame),hwait,['Frame # ',num2str(1),'   Estimated time: ',num2str((Frame-1)*elapsedTime),' s'])
 
 for f=2:Frame
     ticID = tic;
@@ -237,8 +237,8 @@ for f=2:Frame
     end
 
     elapsedTime = toc(ticID);
-    waitbar((f)/(Frame),hwait,['Frame # ',num2str(f),'   Estimated time: ',num2str(round((Frame-f)*elapsedTime)),' s (',...
-        num2str(round(elapsedTime)),' Sec/Frame)'])
+%     waitbar((f)/(Frame),hwait,['Frame # ',num2str(f),'   Estimated time: ',num2str(round((Frame-f)*elapsedTime)),' s (',...
+%         num2str(round(elapsedTime)),' Sec/Frame)'])
 end
-close(hwait)
+% close(hwait)
 

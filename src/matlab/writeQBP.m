@@ -1,8 +1,8 @@
 function writeQBP(ttmode, N, M, fname, data,n,dv)
     %% write out
     allQ = data.allQ(1:n,:);
-    allSparseQ = data.allSparseQ(1:n,:);
-    allnnz = data.allnnz(1:n,:);
+%     allSparseQ = data.allSparseQ(1:n,:);
+%     allnnz = data.allnnz(1:n,:);
     allc = data.allc(1:n,:);
     allSol = data.allSol(1:n,:);
     allSolInt = data.allSolInt(1:n,:);

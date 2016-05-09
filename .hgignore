@@ -15,3 +15,4 @@ src/matlab/Matching/Cars_*
 src/matlab/parsearch/*
 src/matlab/tracking/Data*
 src/matlab/Data*
+src/matlab/tracking/Training*
