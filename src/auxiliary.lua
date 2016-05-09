@@ -311,11 +311,11 @@ end
 
 
 
-
 --------------------------------------------------------------------------
 --- read QBP data and solutions
-function readQBPData(ttmode, testfile, readnth)
+function readQBPData(ttmode, testfile, readnth, filebase)
   readnth = readnth or 1
+	filebase = filebase or 'QBP'
   
   local ProbTab, SolTab = {},{}
   local ValProbTab, ValSolTab = {},{}
@@ -334,7 +334,10 @@ function readQBPData(ttmode, testfile, readnth)
     local allDataFiles = {}
     for file in lfs.dir(dataDir) do
       local ff = dataDir..file
-      local srchstr=string.format('QBP[-]%s_m%d_N%d_M%d[-]0503',opt.inference,opt.mbst,opt.max_n, opt.max_m)      
+      local srchstr=string.format('%s[-]%s_m%d_N%d_M%d[-]0503',filebase,opt.inference,opt.mbst,opt.max_n, opt.max_m)      
+			if filebase == 'LBP' then
+				srchstr = string.format('LBP_N%d_M%d',opt.max_n, opt.max_m)
+			end
       if ff:find(srchstr) then
         table.insert(allDataFiles, ff)
       end
@@ -344,7 +347,7 @@ function readQBPData(ttmode, testfile, readnth)
     readnth = math.min(readnth, #allDataFiles)
     Qfile = allDataFiles[readnth]    
   end
-  
+	
 --  local Qfile = string.format('%s/QBP-%s_m%d_N%d_M%d.mat', 
 --        dataDir, opt.inference,opt.mbst,opt.max_n, opt.max_m);
 
@@ -679,11 +682,17 @@ end
 function getData(opt, getTraining, getValidation, readnth)
   readnth = readnth or 1
   local _
+	local loadData = true
   pm('getting training/validation data...')
   if opt.problem == 'linear' then
     ----- gen data for Hungarian
-    if getTraining then TrCostTab,TrSolTab = genHunData(opt.synth_training) end
-    if getValidation then ValCostTab,ValSolTab = genHunData(opt.synth_valid) end
+		-- if getTraining then TrCostTab,TrSolTab = genHunData(opt.synth_training) end
+		-- if getValidation then ValCostTab,ValSolTab = genHunData(opt.synth_valid) end
+		if loadData then
+			if getTraining and getValidation then			
+				TrCostTab,TrSolTab,ValCostTab,ValSolTab = readQBPData('train', nil, readnth,'LBP')
+			end		
+		end
   elseif opt.problem == 'quadratic'  then
     if getTraining and getValidation then
       TrCostTab,TrSolTab,ValCostTab,ValSolTab = readQBPData('train', nil, readnth)
@@ -709,7 +718,7 @@ function getData(opt, getTraining, getValidation, readnth)
     end
   end
 
-  if opt.inference == 'marginal' and opt.problem=='linear' then
+  if opt.inference == 'marginal' and opt.problem=='linear' and not loadData then
     pm('Computing marginals...')
     if getTraining then TrSolTab = computeMarginals(TrCostTab) end
     if getValidation then ValSolTab = computeMarginals(ValCostTab) end
