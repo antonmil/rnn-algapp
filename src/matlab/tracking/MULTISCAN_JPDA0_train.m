@@ -167,7 +167,7 @@ for f=2:Frame
             if strcmp(Tracking_Scheme,'JPDA_HA')
                 [HA,~] = Hungarian(-log(Fi_probabilty));
             end
-        elseif strcmp(Tracking_Scheme,'LSTM')
+        elseif strcmp(Tracking_Scheme,'LSTM')||strcmp(Tracking_Scheme,'LSTM_HA')
             [Fi_probabilty, ~, HA]=LSTMDA(Assign_matrix{r,k});
             Fi_probabilty2=Fi_probabilty;
         elseif strcmp(Tracking_Scheme,'HA')
