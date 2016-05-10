@@ -4,7 +4,7 @@ if nargin~=18
     error('Not enough inputs. Please check your inputs')
 end
 
-% hwait = waitbar(0,'Background Extraction');
+hwait = waitbar(0,'Background Extraction');
 elapsedTime=inf;
 
 
@@ -79,7 +79,7 @@ Terminated_objects_index=[];
 Assign_matrix = cell(Kt,Frame);
 Hypo_matrix = cell(Kt,Frame);
 %************************ Kalman Filter Tracking **************************
-% waitbar((1)/(Frame),hwait,['Frame # ',num2str(1),'   Estimated time: ',num2str((Frame-1)*elapsedTime),' s'])
+waitbar((1)/(Frame),hwait,['Frame # ',num2str(1),'   Estimated time: ',num2str((Frame-1)*elapsedTime),' s'])
 
 for f=2:Frame
     ticID = tic;
@@ -148,6 +148,16 @@ for f=2:Frame
         Mes_Tar(:,:,r)=[false(Vmt,Vmt+Umt);Mes_Tar2(:,:,r) false(Umt,Umt)];
         if strcmp(Tracking_Scheme,'JPDA') 
             Final_probabilty{1,r}(1,exist_ind) =Approx_Multiscan_JPDA_Probabilities(Mes_Tar(:,:,r),Rt_In_Pr(exist_ind,r),mbest);
+            Assign_matrixx=Assign_matrix{r,k}; %#ok<NASGU>
+            Fi_probabilty=cell2mat(Final_probabilty{1,r}(1,exist_ind))';
+            Fi_probabilty=Fi_probabilty(:,2:end);
+            Fi_probabilty2=Fi_probabilty;
+            szzi= size(Fi_probabilty,2);
+            for jws=1:szzi
+                Fi_probabilty2(jws,Hypo_matrix{r,k}(jws,:)) = Fi_probabilty(jws,:);
+            end
+            Fi_probabilty = Fi_probabilty2./repmat(sum(Fi_probabilty2,2),[1 size(Fi_probabilty2,2)]);
+            save([pwd,filesep,'Training_assignment_matrix',filesep,'Data_tr_Exp',num2str(exp_n),'_Fr_',num2str(k)],'Assign_matrixx','Fi_probabilty')
         elseif strcmp(Tracking_Scheme,'JPDA_fst')||strcmp(Tracking_Scheme,'JPDA_HA')
             Fi_probabilty = Efficient_JPDA(Assign_matrix{r,k});
             Assign_matrixx=Assign_matrix{r,k}; %#ok<NASGU>
@@ -237,8 +247,8 @@ for f=2:Frame
     end
 
     elapsedTime = toc(ticID);
-%     waitbar((f)/(Frame),hwait,['Frame # ',num2str(f),'   Estimated time: ',num2str(round((Frame-f)*elapsedTime)),' s (',...
-%         num2str(round(elapsedTime)),' Sec/Frame)'])
+    waitbar((f)/(Frame),hwait,['Frame # ',num2str(f),'   Estimated time: ',num2str(round((Frame-f)*elapsedTime)),' s (',...
+        num2str(round(elapsedTime)),' Sec/Frame)'])
 end
-% close(hwait)
+close(hwait)
 

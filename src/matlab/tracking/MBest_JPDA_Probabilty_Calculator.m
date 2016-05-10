@@ -62,6 +62,7 @@ end
 % Aeq = sparse(Aeq);
 options = optimoptions('intlinprog','Display','off','CutGeneration','none','BranchingRule','mostfractional');
 tic
+f(isinf(f))=10^5;
 [candidates, values] = BinIntMBest(f,A,b,Aeq,beq,options,N);
 fprintf('NFramework');
 for hc=1:length(values)

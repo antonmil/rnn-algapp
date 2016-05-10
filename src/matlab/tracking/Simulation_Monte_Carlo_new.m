@@ -3,6 +3,9 @@ clear all
 clc
 
 addpath(fullfile([pwd,filesep,'L-OSPA']))
+addpath('C:\gurobi651\win64\matlab')
+gurobi_setup
+
 addpath(genpath('../Matching'))
 rng(321);
 K= 20;                                 %number of frames
@@ -52,6 +55,10 @@ dist_lospa1_jpda = zeros(Num_Exp,K);
 loce_lospa1_jpda= zeros(Num_Exp,K);
 carde_lospa1_jpda= zeros(Num_Exp,K);
 
+dist_lospa1_jpdam = zeros(Num_Exp,K);
+loce_lospa1_jpdam= zeros(Num_Exp,K);
+carde_lospa1_jpdam= zeros(Num_Exp,K);
+
 dist_lospa1_jpda_ha = zeros(Num_Exp,K);
 loce_lospa1_jpda_ha= zeros(Num_Exp,K);
 carde_lospa1_jpda_ha= zeros(Num_Exp,K);
@@ -67,19 +74,6 @@ carde_lospa1_LSTM= zeros(Num_Exp,K);
 dist_lospa1_LSTM_ha = zeros(Num_Exp,K);
 loce_lospa1_LSTM_ha= zeros(Num_Exp,K);
 carde_lospa1_LSTM_ha= zeros(Num_Exp,K);
-
-
-
-JPDA_Er=cell(1,length(1:max(TN_H)));
-NVHypo=cell(Num_Exp,K);
-TNH=cell(Num_Exp,K);
-TimeComp=cell(Num_Exp,K);
-
-JPDA_Er_3F=cell(1,length(1:max(TN_H)));
-NVHypo_3F=cell(Num_Exp,K);
-TNH_3F=cell(Num_Exp,K);
-TimeComp_3F=cell(Num_Exp,K);
-
 
 
 for NoE=1:Num_Exp
@@ -166,7 +160,8 @@ set(gca,'YTick',5:10:30),set(gca,'XTick',5:10:30),
 % JPDA Parameters
 JPDA_multiscale=1; % Time-Frame windows
 Tracking_Scheme='JPDA_fst';
-[XeT,~,~,~,Ff,Term_Con,~]=MULTISCAN_JPDA0(XYZ,F,Q,H,R,X0,P0,Tracking_Scheme,JPDA_P,TN_H(end),...
+mbst = [];
+[XeT,~,~,~,Ff,Term_Con,~]=MULTISCAN_JPDA0(XYZ,F,Q,H,R,X0,P0,Tracking_Scheme,JPDA_P,mbst,...
     JPDA_multiscale,PD,S_limit,mui0,TPM,TPM_Option,H_TPM);
 
 X_size=cellfun(@(x) size(x,2), XeT, 'UniformOutput', false);
@@ -190,11 +185,42 @@ figure,
 
 [dist_lospa1_jpda(NoE,:),loce_lospa1_jpda(NoE,:),carde_lospa1_jpda(NoE,:),~,~] = perf_asses(xy_GT,est_trk_j(1:2:3,:,:),OSPA,'No');
 clear Xtrg Ytrg XeT Ff est_trk_j X_tr_j Fr_tr_j JPDA_multiscale N_H tStart
+
+%% 1 Frame, JPDA_m
+% JPDA Parameters
+JPDA_multiscale=1; % Time-Frame windows
+Tracking_Scheme='JPDA';
+mbst = 10; 
+[XeT,~,~,~,Ff,Term_Con,~]=MULTISCAN_JPDA0(XYZ,F,Q,H,R,X0,P0,Tracking_Scheme,JPDA_P,mbst,...
+    JPDA_multiscale,PD,S_limit,mui0,TPM,TPM_Option,H_TPM);
+
+X_size=cellfun(@(x) size(x,2), XeT, 'UniformOutput', false);
+Ff=cellfun(@(x,y,z) x(1):x(1)+y-1-z, Ff,X_size,Term_Con, 'ErrorHandler', @errorfun, ...
+    'UniformOutput', false);
+Ff_size=cellfun(@(x) size(x,2), Ff, 'UniformOutput', false);
+XeT=cellfun(@(x,y) x(:,1:y),XeT,Ff_size, 'ErrorHandler', @errorfun, ...
+    'UniformOutput', false);
+
+[X_tr_j,Fr_tr_j,~,~]=Trajectory_Generator_Pruner_IMMJPDA(XeT,Ff,K,0);
+[~,est_trk_j]=Track_Preprator(X_tr_j,Xdy,Fr_tr_j,Frdy,K);
+
+figure,
+    for nn=1:size(X_tr_j,2)
+        plot(X_tr_j{nn}(1,:),X_tr_j{nn}(3,:),'s','Color',colorord(nn,:),'MarkerEdgeColor',colorord(nn,:),...
+            'MarkerFaceColor',colorord(nn,:),'MarkerSize',4)
+        hold on
+    end
+    axis([Surv_region(1,:) Surv_region(2,:)])
+
+
+[dist_lospa1_jpdam(NoE,:),loce_lospa1_jpdam(NoE,:),carde_lospa1_jpdam(NoE,:),~,~] = perf_asses(xy_GT,est_trk_j(1:2:3,:,:),OSPA,'No');
+clear Xtrg Ytrg XeT Ff est_trk_j X_tr_j Fr_tr_j JPDA_multiscale N_H tStart
 %% 1 Frame, JPDA_HA
 % JPDA Parameters
 JPDA_multiscale=1; % Time-Frame windows
 Tracking_Scheme='JPDA_HA';
-[XeT,~,~,~,Ff,Term_Con,~]=MULTISCAN_JPDA0(XYZ,F,Q,H,R,X0,P0,Tracking_Scheme,JPDA_P,TN_H(end),...
+mbst = [];
+[XeT,~,~,~,Ff,Term_Con,~]=MULTISCAN_JPDA0(XYZ,F,Q,H,R,X0,P0,Tracking_Scheme,JPDA_P,mbst,...
     JPDA_multiscale,PD,S_limit,mui0,TPM,TPM_Option,H_TPM);
 
 X_size=cellfun(@(x) size(x,2), XeT, 'UniformOutput', false);
@@ -222,7 +248,8 @@ clear Xtrg Ytrg XeT Ff est_trk_j X_tr_j Fr_tr_j JPDA_multiscale N_H tStart
 % JPDA Parameters
 JPDA_multiscale=1; % Time-Frame windows
 Tracking_Scheme='HA';
-[XeT,~,~,~,Ff,Term_Con,~]=MULTISCAN_JPDA0(XYZ,F,Q,H,R,X0,P0,Tracking_Scheme,JPDA_P,TN_H(end),...
+mbst = [];
+[XeT,~,~,~,Ff,Term_Con,~]=MULTISCAN_JPDA0(XYZ,F,Q,H,R,X0,P0,Tracking_Scheme,JPDA_P,mbst,...
     JPDA_multiscale,PD,S_limit,mui0,TPM,TPM_Option,H_TPM);
 
 X_size=cellfun(@(x) size(x,2), XeT, 'UniformOutput', false);
@@ -250,7 +277,8 @@ clear Xtrg Ytrg XeT Ff est_trk_j X_tr_j Fr_tr_j JPDA_multiscale N_H tStart
 % JPDA Parameters
 JPDA_multiscale=1; % Time-Frame windows
 Tracking_Scheme='LSTM';
-[XeT,~,~,~,Ff,Term_Con,~]=MULTISCAN_JPDA0(XYZ,F,Q,H,R,X0,P0,Tracking_Scheme,JPDA_P,TN_H(end),...
+mbst =[];
+[XeT,~,~,~,Ff,Term_Con,~]=MULTISCAN_JPDA0(XYZ,F,Q,H,R,X0,P0,Tracking_Scheme,JPDA_P,mbst,...
     JPDA_multiscale,PD,S_limit,mui0,TPM,TPM_Option,H_TPM);
 
 X_size=cellfun(@(x) size(x,2), XeT, 'UniformOutput', false);
@@ -279,7 +307,8 @@ clear Xtrg Ytrg XeT Ff est_trk_j X_tr_j Fr_tr_j JPDA_multiscale N_H tStart
 % JPDA Parameters
 JPDA_multiscale=1; % Time-Frame windows
 Tracking_Scheme='LSTM_HA';
-[XeT,~,~,~,Ff,Term_Con,~]=MULTISCAN_JPDA0(XYZ,F,Q,H,R,X0,P0,Tracking_Scheme,JPDA_P,TN_H(end),...
+mbst = [];
+[XeT,~,~,~,Ff,Term_Con,~]=MULTISCAN_JPDA0(XYZ,F,Q,H,R,X0,P0,Tracking_Scheme,JPDA_P,mbst,...
     JPDA_multiscale,PD,S_limit,mui0,TPM,TPM_Option,H_TPM);
 
 X_size=cellfun(@(x) size(x,2), XeT, 'UniformOutput', false);

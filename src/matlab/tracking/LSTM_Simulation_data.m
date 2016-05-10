@@ -1,6 +1,8 @@
 close all
 clc
 
+addpath('C:\gurobi651\win64\matlab')
+gurobi_setup
 
 K= 20;                                 %number of frames
 T= 1;                                   %sampling period [s]
@@ -77,8 +79,11 @@ for NoE=1:Num_Exp
     %% 1 Frame, JPDA
     % JPDA Parameters
     JPDA_multiscale=1; % Time-Frame windows
-    Tracking_Scheme='JPDA_fst';
-    [XeT,~,~,~,Ff,Term_Con,~]=MULTISCAN_JPDA0_train(XYZ,F,Q,H,R,X0,P0,Tracking_Scheme,JPDA_P,[],...
+    Tracking_Scheme='JPDA';
+    mbest = 10;
+%     Tracking_Scheme='JPDA_fst';
+%     mbest = [];
+    [XeT,~,~,~,Ff,Term_Con,~]=MULTISCAN_JPDA0_train(XYZ,F,Q,H,R,X0,P0,Tracking_Scheme,JPDA_P,mbest,...
         JPDA_multiscale,PD,S_limit,mui0,TPM,TPM_Option,H_TPM,NoE);
     
     clear Xtrg Ytrg XeT Ff est_trk_j X_tr_j Fr_tr_j JPDA_multiscale N_H tStart

@@ -16,12 +16,12 @@ for i=unique(C2)
     else
         TNH=prod(NR_C);
     end
-%     if isinf(mbest)
+    if isinf(mbest)||isempty(mbest)
         [Final_probabilty(ix),~]=JPDA_Probabilty_Calculator(Obj_info(ix));
-%     else
+    else
         
-%         Final_probabilty(ix)=MBest_JPDA_Probabilty_Calculator(Obj_info(ix),mbest);
-%     end
+        Final_probabilty(ix)=MBest_JPDA_Probabilty_Calculator(Obj_info(ix),mbest);
+    end
     
 end
 
