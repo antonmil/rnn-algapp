@@ -376,15 +376,18 @@ end
 %% Mean over all MC runs
 mnames = {'jpda','jpdam','jpda_ha','ha','LSTM_ha','LSTM'};
 errors = {'dist','loce','carde'};
-fprintf('\nOverall Mean\n%10s|%10s|%10s|%10s|\n--------------------------------------------\n','Method','Dist','Loce','Carde');
+fprintf('\nOverall Mean\n%10s|%12s\n------------------------------------------------\n','Method','Dist');
 for m=1:length(mnames)
     mname = char(mnames(m));
     methErrors = zeros(1,3);
+    methStd = zeros(1,3);
     for e=1:3
-        eval(sprintf('thisError = mean(mean(%s_lospa1_%s(1:NoE,:)));',char(errors(e)),mname));
+        eval(sprintf('thisError = mean(mean(%s_lospa1_%s(1:NoE,:),2));',char(errors(e)),mname));
         methErrors(e) = thisError;
+        eval(sprintf('thisError = std(mean(%s_lospa1_%s(1:NoE,:),2));',char(errors(e)),mname));
+        methStd(e) = thisError;
     end
-    fprintf('%10s|%10.2f|%10.2f|%10.2f|\n',mname,methErrors(1), methErrors(2),methErrors(3));
+    fprintf('%10s|%5.2f (%.2f)\n',mname,methErrors(1),methStd(1));
 end
 
 pause(.5)
