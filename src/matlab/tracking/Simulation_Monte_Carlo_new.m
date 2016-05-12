@@ -173,6 +173,8 @@ XeT=cellfun(@(x,y) x(:,1:y),XeT,Ff_size, 'ErrorHandler', @errorfun, ...
 
 [X_tr_j,Fr_tr_j,~,~]=Trajectory_Generator_Pruner_IMMJPDA(XeT,Ff,K,0);
 [~,est_trk_j]=Track_Preprator(X_tr_j,Xdy,Fr_tr_j,Frdy,K);
+[stateInfo,gtInfo] = reformat_Anton(XYZ,XeT,Ff,xy_GT);
+% [metrics,metricsInfo,additionalInfo]=CLEAR_MOT(gtInfo,stateInfo,options);
 
 figure,
     for nn=1:size(X_tr_j,2)
@@ -181,7 +183,6 @@ figure,
         hold on
     end
     axis([Surv_region(1,:) Surv_region(2,:)])
-
 
 [dist_lospa1_jpda(NoE,:),loce_lospa1_jpda(NoE,:),carde_lospa1_jpda(NoE,:),~,~] = perf_asses(xy_GT,est_trk_j(1:2:3,:,:),OSPA,'No');
 clear Xtrg Ytrg XeT Ff est_trk_j X_tr_j Fr_tr_j JPDA_multiscale N_H tStart
@@ -203,6 +204,8 @@ XeT=cellfun(@(x,y) x(:,1:y),XeT,Ff_size, 'ErrorHandler', @errorfun, ...
 
 [X_tr_j,Fr_tr_j,~,~]=Trajectory_Generator_Pruner_IMMJPDA(XeT,Ff,K,0);
 [~,est_trk_j]=Track_Preprator(X_tr_j,Xdy,Fr_tr_j,Frdy,K);
+[stateInfo,~] = reformat_Anton(XYZ,XeT,Ff,[]);
+% [metrics,metricsInfo,additionalInfo]=CLEAR_MOT(gtInfo,stateInfo,options);
 
 figure,
     for nn=1:size(X_tr_j,2)
@@ -232,6 +235,8 @@ XeT=cellfun(@(x,y) x(:,1:y),XeT,Ff_size, 'ErrorHandler', @errorfun, ...
 
 [X_tr_j,Fr_tr_j,~,~]=Trajectory_Generator_Pruner_IMMJPDA(XeT,Ff,K,0);
 [~,est_trk_j]=Track_Preprator(X_tr_j,Xdy,Fr_tr_j,Frdy,K);
+[stateInfo,~] = reformat_Anton(XYZ,XeT,Ff,[]);
+% [metrics,metricsInfo,additionalInfo]=CLEAR_MOT(gtInfo,stateInfo,options);
 
 figure,
     for nn=1:size(X_tr_j,2)
@@ -261,6 +266,8 @@ XeT=cellfun(@(x,y) x(:,1:y),XeT,Ff_size, 'ErrorHandler', @errorfun, ...
 
 [X_tr_j,Fr_tr_j,~,~]=Trajectory_Generator_Pruner_IMMJPDA(XeT,Ff,K,0);
 [~,est_trk_j]=Track_Preprator(X_tr_j,Xdy,Fr_tr_j,Frdy,K);
+[stateInfo,~] = reformat_Anton(XYZ,XeT,Ff,[]);
+% [metrics,metricsInfo,additionalInfo]=CLEAR_MOT(gtInfo,stateInfo,options);
 
 figure,
     for nn=1:size(X_tr_j,2)
@@ -290,6 +297,8 @@ XeT=cellfun(@(x,y) x(:,1:y),XeT,Ff_size, 'ErrorHandler', @errorfun, ...
 
 [X_tr_j,Fr_tr_j,~,~]=Trajectory_Generator_Pruner_IMMJPDA(XeT,Ff,K,0);
 [~,est_trk_j]=Track_Preprator(X_tr_j,Xdy,Fr_tr_j,Frdy,K);
+[stateInfo,~] = reformat_Anton(XYZ,XeT,Ff,[]);
+% [metrics,metricsInfo,additionalInfo]=CLEAR_MOT(gtInfo,stateInfo,options);
 
 figure,
     for nn=1:size(X_tr_j,2)
@@ -320,6 +329,8 @@ XeT=cellfun(@(x,y) x(:,1:y),XeT,Ff_size, 'ErrorHandler', @errorfun, ...
 
 [X_tr_j,Fr_tr_j,~,~]=Trajectory_Generator_Pruner_IMMJPDA(XeT,Ff,K,0);
 [~,est_trk_j]=Track_Preprator(X_tr_j,Xdy,Fr_tr_j,Frdy,K);
+[stateInfo,~] = reformat_Anton(XYZ,XeT,Ff,[]);
+% [metrics,metricsInfo,additionalInfo]=CLEAR_MOT(gtInfo,stateInfo,options);
 
 figure,
     for nn=1:size(X_tr_j,2)
