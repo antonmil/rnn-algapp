@@ -335,8 +335,8 @@ function readQBPData(ttmode, testfile, readnth, filebase)
     for file in lfs.dir(dataDir) do
       local ff = dataDir..file
       local srchstr=string.format('%s[-]%s_m%d_N%d_M%d[-]0503',filebase,opt.inference,opt.mbst,opt.max_n, opt.max_m)      
-			if filebase == 'LBP' then
-				srchstr = string.format('LBP_N%d_M%d',opt.max_n, opt.max_m)
+			if filebase == 'LBP' or filebase == 'LBPm' then
+				srchstr = string.format('%s_N%d_M%d',filebase,opt.max_n, opt.max_m)
 			end
       if ff:find(srchstr) then
         table.insert(allDataFiles, ff)
@@ -690,7 +690,7 @@ function getData(opt, getTraining, getValidation, readnth)
 		-- if getValidation then ValCostTab,ValSolTab = genHunData(opt.synth_valid) end
 		if loadData then
 			if getTraining and getValidation then			
-				TrCostTab,TrSolTab,ValCostTab,ValSolTab = readQBPData('train', nil, readnth,'LBP')
+				TrCostTab,TrSolTab,ValCostTab,ValSolTab = readQBPData('train', nil, readnth,'LBPm')
 			end		
 		end
   elseif opt.problem == 'quadratic'  then

@@ -1,7 +1,12 @@
 close all
 clc
 
-addpath('C:\gurobi651\win64\matlab')
+if ispc
+    addpath('C:\gurobi651\win64\matlab')
+    
+else
+    addpath('~/software/gurobi603/linux64/matlab/')
+end
 gurobi_setup
 
 K= 20;                                 %number of frames
@@ -110,7 +115,7 @@ for f=1:nFiles
 end
 
 ttmode='train';
-fname='LBP';
+fname='LBPm';
 outf = fullfile('..','..','..','data',ttmode);
 if ~exist(outf,'dir'), mkdir(outf); end
 filename = sprintf('%s%s%s_N%d_M%d',outf,filesep,fname,N,M);

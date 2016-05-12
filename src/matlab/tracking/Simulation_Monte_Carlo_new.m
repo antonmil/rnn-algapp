@@ -3,15 +3,25 @@ clear all
 clc
 
 addpath(fullfile([pwd,filesep,'L-OSPA']))
-addpath('C:\gurobi651\win64\matlab')
+if ispc
+    addpath('C:\gurobi651\win64\matlab')
+    
+else
+    addpath('~/software/gurobi603/linux64/matlab/')
+end
 gurobi_setup
 
 addpath(genpath('../Matching'))
+addpath('../external/export_fig');
+
+if ~exist('figures', 'dir'), mkdir('figures'); end
+
 rng(321);
 K= 20;                                 %number of frames
 T= 1;                                   %sampling period [s]
 OSPA.p = 2;OSPA.c = 25;OSPA.l = 25;
-Num_Exp=10; % number of monte carlo experiments
+Num_Exp=100; % number of monte carlo experiments
+saveFigures = false;
 
 
 u_image=30;v_image=30;
@@ -128,10 +138,12 @@ for k=1:K
 end
 daspect([0.7,1,1])
 set(gca,'FontName','Times','FontSize',16),
-xlabel('x-coordinate'),ylabel('y-coordinate')
+% xlabel('x-coordinate'),ylabel('y-coordinate')
 set(gca,'YTick',5:10:30),set(gca,'XTick',5:10:30),
 
 % print -dpsc 'GT_State.eps'
+if saveFigures,export_fig(sprintf('figures/Exp-%04d-GT_State.pdf',NoE),'-a1','-native','-transparent'); end
+
 
 figure,
 
@@ -152,9 +164,10 @@ for k=1:K
 end
 daspect([0.7,1,1])
 set(gca,'FontName','Times','FontSize',16),
-xlabel('x-coordinate'),ylabel('y-coordinate')
+% xlabel('x-coordinate'),ylabel('y-coordinate')
 set(gca,'YTick',5:10:30),set(gca,'XTick',5:10:30),
 
+if saveFigures,export_fig(sprintf('figures/Exp-%04d-Detections.pdf',NoE),'-a1','-native','-transparent'); end
 % print -dpsc 'Detections.eps'
 %% 1 Frame, JPDA
 % JPDA Parameters
@@ -173,8 +186,6 @@ XeT=cellfun(@(x,y) x(:,1:y),XeT,Ff_size, 'ErrorHandler', @errorfun, ...
 
 [X_tr_j,Fr_tr_j,~,~]=Trajectory_Generator_Pruner_IMMJPDA(XeT,Ff,K,0);
 [~,est_trk_j]=Track_Preprator(X_tr_j,Xdy,Fr_tr_j,Frdy,K);
-[stateInfo,gtInfo] = reformat_Anton(XYZ,XeT,Ff,xy_GT);
-% [metrics,metricsInfo,additionalInfo]=CLEAR_MOT(gtInfo,stateInfo,options);
 
 figure,
     for nn=1:size(X_tr_j,2)
@@ -183,6 +194,7 @@ figure,
         hold on
     end
     axis([Surv_region(1,:) Surv_region(2,:)])
+if saveFigures,export_fig(sprintf('figures/Exp-%04d-%s.pdf',NoE,Tracking_Scheme),'-a1','-native','-transparent'); end
 
 [dist_lospa1_jpda(NoE,:),loce_lospa1_jpda(NoE,:),carde_lospa1_jpda(NoE,:),~,~] = perf_asses(xy_GT,est_trk_j(1:2:3,:,:),OSPA,'No');
 clear Xtrg Ytrg XeT Ff est_trk_j X_tr_j Fr_tr_j JPDA_multiscale N_H tStart
@@ -204,8 +216,6 @@ XeT=cellfun(@(x,y) x(:,1:y),XeT,Ff_size, 'ErrorHandler', @errorfun, ...
 
 [X_tr_j,Fr_tr_j,~,~]=Trajectory_Generator_Pruner_IMMJPDA(XeT,Ff,K,0);
 [~,est_trk_j]=Track_Preprator(X_tr_j,Xdy,Fr_tr_j,Frdy,K);
-[stateInfo,~] = reformat_Anton(XYZ,XeT,Ff,[]);
-% [metrics,metricsInfo,additionalInfo]=CLEAR_MOT(gtInfo,stateInfo,options);
 
 figure,
     for nn=1:size(X_tr_j,2)
@@ -214,7 +224,7 @@ figure,
         hold on
     end
     axis([Surv_region(1,:) Surv_region(2,:)])
-
+if saveFigures,export_fig(sprintf('figures/Exp-%04d-%s.pdf',NoE,Tracking_Scheme),'-a1','-native','-transparent'); end
 
 [dist_lospa1_jpdam(NoE,:),loce_lospa1_jpdam(NoE,:),carde_lospa1_jpdam(NoE,:),~,~] = perf_asses(xy_GT,est_trk_j(1:2:3,:,:),OSPA,'No');
 clear Xtrg Ytrg XeT Ff est_trk_j X_tr_j Fr_tr_j JPDA_multiscale N_H tStart
@@ -235,8 +245,6 @@ XeT=cellfun(@(x,y) x(:,1:y),XeT,Ff_size, 'ErrorHandler', @errorfun, ...
 
 [X_tr_j,Fr_tr_j,~,~]=Trajectory_Generator_Pruner_IMMJPDA(XeT,Ff,K,0);
 [~,est_trk_j]=Track_Preprator(X_tr_j,Xdy,Fr_tr_j,Frdy,K);
-[stateInfo,~] = reformat_Anton(XYZ,XeT,Ff,[]);
-% [metrics,metricsInfo,additionalInfo]=CLEAR_MOT(gtInfo,stateInfo,options);
 
 figure,
     for nn=1:size(X_tr_j,2)
@@ -245,7 +253,7 @@ figure,
         hold on
     end
     axis([Surv_region(1,:) Surv_region(2,:)])
-
+if saveFigures,export_fig(sprintf('figures/Exp-%04d-%s.pdf',NoE,Tracking_Scheme),'-a1','-native','-transparent'); end
 
 [dist_lospa1_jpda_ha(NoE,:),loce_lospa1_jpda_ha(NoE,:),carde_lospa1_jpda_ha(NoE,:),~,~] = perf_asses(xy_GT,est_trk_j(1:2:3,:,:),OSPA,'No');
 clear Xtrg Ytrg XeT Ff est_trk_j X_tr_j Fr_tr_j JPDA_multiscale N_H tStart
@@ -266,8 +274,6 @@ XeT=cellfun(@(x,y) x(:,1:y),XeT,Ff_size, 'ErrorHandler', @errorfun, ...
 
 [X_tr_j,Fr_tr_j,~,~]=Trajectory_Generator_Pruner_IMMJPDA(XeT,Ff,K,0);
 [~,est_trk_j]=Track_Preprator(X_tr_j,Xdy,Fr_tr_j,Frdy,K);
-[stateInfo,~] = reformat_Anton(XYZ,XeT,Ff,[]);
-% [metrics,metricsInfo,additionalInfo]=CLEAR_MOT(gtInfo,stateInfo,options);
 
 figure,
     for nn=1:size(X_tr_j,2)
@@ -276,7 +282,7 @@ figure,
         hold on
     end
     axis([Surv_region(1,:) Surv_region(2,:)])
-
+if saveFigures,export_fig(sprintf('figures/Exp-%04d-%s.pdf',NoE,Tracking_Scheme),'-a1','-native','-transparent'); end
 
 [dist_lospa1_ha(NoE,:),loce_lospa1_ha(NoE,:),carde_lospa1_ha(NoE,:),~,~] = perf_asses(xy_GT,est_trk_j(1:2:3,:,:),OSPA,'No');
 clear Xtrg Ytrg XeT Ff est_trk_j X_tr_j Fr_tr_j JPDA_multiscale N_H tStart
@@ -297,8 +303,6 @@ XeT=cellfun(@(x,y) x(:,1:y),XeT,Ff_size, 'ErrorHandler', @errorfun, ...
 
 [X_tr_j,Fr_tr_j,~,~]=Trajectory_Generator_Pruner_IMMJPDA(XeT,Ff,K,0);
 [~,est_trk_j]=Track_Preprator(X_tr_j,Xdy,Fr_tr_j,Frdy,K);
-[stateInfo,~] = reformat_Anton(XYZ,XeT,Ff,[]);
-% [metrics,metricsInfo,additionalInfo]=CLEAR_MOT(gtInfo,stateInfo,options);
 
 figure,
     for nn=1:size(X_tr_j,2)
@@ -329,8 +333,6 @@ XeT=cellfun(@(x,y) x(:,1:y),XeT,Ff_size, 'ErrorHandler', @errorfun, ...
 
 [X_tr_j,Fr_tr_j,~,~]=Trajectory_Generator_Pruner_IMMJPDA(XeT,Ff,K,0);
 [~,est_trk_j]=Track_Preprator(X_tr_j,Xdy,Fr_tr_j,Frdy,K);
-[stateInfo,~] = reformat_Anton(XYZ,XeT,Ff,[]);
-% [metrics,metricsInfo,additionalInfo]=CLEAR_MOT(gtInfo,stateInfo,options);
 
 figure,
     for nn=1:size(X_tr_j,2)
@@ -340,19 +342,21 @@ figure,
     end
     axis([Surv_region(1,:) Surv_region(2,:)])
 
+if saveFigures,export_fig(sprintf('figures/Exp-%04d-%s.pdf',NoE,Tracking_Scheme),'-a1','-native','-transparent'); end
 
 [dist_lospa1_LSTM_ha(NoE,:),loce_lospa1_LSTM_ha(NoE,:),carde_lospa1_LSTM_ha(NoE,:),~,~] = perf_asses(xy_GT,est_trk_j(1:2:3,:,:),OSPA,'No');
 clear Xtrg Ytrg XeT Ff est_trk_j X_tr_j Fr_tr_j JPDA_multiscale N_H tStart
 
 save('synthetic_results_new',...
     'dist_lospa1_jpda','loce_lospa1_jpda','carde_lospa1_jpda',...
+		'dist_lospa1_jpdam','loce_lospa1_jpdam','carde_lospa1_jpdam',...
     'dist_lospa1_jpda_ha','loce_lospa1_jpda_ha','carde_lospa1_jpda_ha',...
     'dist_lospa1_ha','loce_lospa1_ha','carde_lospa1_ha',...
     'dist_lospa1_LSTM_ha','loce_lospa1_LSTM_ha','carde_lospa1_LSTM_ha',...
     'dist_lospa1_LSTM','loce_lospa1_LSTM','carde_lospa1_LSTM')
 
 %%
-mnames = {'jpda','jpda_ha','ha','LSTM_ha','LSTM'};
+mnames = {'jpda','jpdam','jpda_ha','ha','LSTM_ha','LSTM'};
 errors = {'dist','loce','carde'};
 fprintf('\nExperiment %d\n%10s|%10s|%10s|%10s|\n--------------------------------------------\n',NoE,'Method','Dist','Loce','Carde');
 for m=1:length(mnames)
@@ -370,17 +374,20 @@ end
 
 
 %% Mean over all MC runs
-mnames = {'jpda','jpda_ha','ha','LSTM_ha','LSTM'};
+mnames = {'jpda','jpdam','jpda_ha','ha','LSTM_ha','LSTM'};
 errors = {'dist','loce','carde'};
-fprintf('\nOverall Mean\n%10s|%10s|%10s|%10s|\n--------------------------------------------\n','Method','Dist','Loce','Carde');
+fprintf('\nOverall Mean\n%10s|%12s\n------------------------------------------------\n','Method','Dist');
 for m=1:length(mnames)
     mname = char(mnames(m));
     methErrors = zeros(1,3);
+    methStd = zeros(1,3);
     for e=1:3
-        eval(sprintf('thisError = mean(mean(%s_lospa1_%s(1:NoE,:)));',char(errors(e)),mname));
+        eval(sprintf('thisError = mean(mean(%s_lospa1_%s(1:NoE,:),2));',char(errors(e)),mname));
         methErrors(e) = thisError;
+        eval(sprintf('thisError = std(mean(%s_lospa1_%s(1:NoE,:),2));',char(errors(e)),mname));
+        methStd(e) = thisError;
     end
-    fprintf('%10s|%10.2f|%10.2f|%10.2f|\n',mname,methErrors(1), methErrors(2),methErrors(3));
+    fprintf('%10s|%5.2f (%.2f)\n',mname,methErrors(1),methStd(1));
 end
 
 pause(.5)
@@ -388,7 +395,7 @@ end
 
 %% export to latex
 doExport=false;
-doExport=true;
+% doExport=true;
 N=5;
 if doExport
     fil = fopen(sprintf('%s/numbers/da-N%d.tex',getPaperDir,N),'w');
