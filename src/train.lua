@@ -428,13 +428,16 @@ function feval()
     
   
   local sol = torch.exp(predDA)
-	if opt.inference == 'map' then 
+	if opt.inference == 'map' or opt.inference == 'marginal' then 
 		local mv, mi = torch.max(predDA,3)
 		sol = getOneHotLab2(mi, true, opt.max_n) 
 	end
+--	print(sol)
+--	abort()
 
   local predConstr = evalBatchConstraints(sol)
 --  print(predConstr)
+--  abort()
   sol = sol:reshape(opt.mini_batch_size, opt.max_n*opt.nClasses, 1) -- make batches of column vectors
   local cmtr = nil
   if opt.problem=='linear' then
@@ -450,12 +453,12 @@ function feval()
   
 --  if opt.solution == 'integer' then hOneHot =  getOneHotLab2(huns, opt.mini_batch_size>1, opt.nClasses) end
   
-	if opt.inference == 'map' then 
+	if opt.inference == 'map' or opt.inference == 'marginal' then 
 		if opt.solution == 'distribution' then _,hOneHot = hOneHot:reshape(opt.mini_batch_size, opt.max_n, opt.max_m):max(3) end -- make integer (from max)
 		hOneHot =  getOneHotLab2(hOneHot, opt.mini_batch_size>1, opt.nClasses) -- make binary solutions
 	end
-	-- print(hOneHot)
-	-- abort()
+--	 print(hOneHot)
+--	 abort()
   
 
   local GTConstr = evalBatchConstraints(hOneHot:reshape(opt.mini_batch_size, opt.max_n, opt.max_m))

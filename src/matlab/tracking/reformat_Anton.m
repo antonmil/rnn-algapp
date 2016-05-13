@@ -28,4 +28,6 @@ else
     end
     
     gtInfo.frameNums=(1:Frame)-1;
+    gtInfo.Xgp=gtInfo.X; gtInfo.Ygp=gtInfo.Y;
 end
+stateInfo.Xgp=stateInfo.X; stateInfo.Ygp=stateInfo.Y;

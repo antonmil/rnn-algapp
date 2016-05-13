@@ -9,8 +9,8 @@ solIndex = 2; % 1=integer, 2=distribution
 infIndex = 2; % 1=map, 2=marginal
 model_sign = sprintf('mt1_r%d_l%d_n%d_m%d_o1_s%d_i%d_valen',rnnSize, numLayers, N,N, solIndex, infIndex);
 model_name = 'trainHun';
-model_name = '0509LBc-2';
-model_name = '0511LBc-1';
+% model_name = '0509LBc-2'; % trained on JPDA
+% model_name = '0511LBc-1'; % trained on JPDA_10
 
 allQ=reshape(probs', 1, N*N);
 allSol=reshape(eye(N), 1, N*N);

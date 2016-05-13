@@ -22,13 +22,13 @@
                   vel  0
               fixed_n  1
                lambda  1
-                   mu  0
+                   mu  10
                
             init_from  
         training_file  
            max_epochs  50000
       mini_batch_size  10
-       synth_training  10000
+       synth_training  100
           synth_valid  10
              full_set  0
 
