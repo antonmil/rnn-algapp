@@ -428,8 +428,8 @@ function feval()
     
   
   local sol = torch.exp(predDA)
-	if opt.inference == 'map' or opt.inference == 'marginal' then 
-		local mv, mi = torch.max(predDA,3)
+  local mv, mi = torch.max(predDA,3)
+	if opt.inference == 'map' or opt.inference == 'marginal' then 		
 		sol = getOneHotLab2(mi, true, opt.max_n) 
 	end
 --	print(sol)
