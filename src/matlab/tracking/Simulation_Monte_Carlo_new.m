@@ -11,6 +11,7 @@ else
 end
 gurobi_setup
 
+addpath('..');
 addpath(genpath('../Matching'))
 addpath('../external/export_fig');
 
@@ -23,12 +24,14 @@ OSPA.p = 2;OSPA.c = 1;OSPA.l = 1;
 CLEARoptions.eval3d=1;
 CLEARoptions.td=1;
 
-Num_Exp=1; % number of monte carlo experiments
-saveFigures = false;
+Num_Exp=100; % number of monte carlo experiments
+saveFigures = true;
 
 
 u_image=30;v_image=30;
 Surv_region=[1 u_image; 1 v_image];     %survillance area
+Surv_region(2,1)=8; Surv_region(2,2)=22;
+XTicks = 5:10:25; YTicks = 10:5:20;
 X0=[5 1 11 0.4;5 1 13 0.2;5 1 15 0;5 1 17 -0.2;5 1 19 -0.4];   % Inital state
 
 F11=[1 T;0 1];
@@ -149,7 +152,7 @@ end
 daspect([0.7,1,1])
 set(gca,'FontName','Times','FontSize',16),
 % xlabel('x-coordinate'),ylabel('y-coordinate')
-set(gca,'YTick',5:10:30),set(gca,'XTick',5:10:30),
+set(gca,'YTick',YTicks),set(gca,'XTick',XTicks),pause(0.01)
 
 % print -dpsc 'GT_State.eps'
 if saveFigures,export_fig(sprintf('figures/Exp-%04d-GT_State.pdf',NoE),'-a1','-native','-transparent'); end
@@ -175,9 +178,12 @@ end
 daspect([0.7,1,1])
 set(gca,'FontName','Times','FontSize',16),
 % xlabel('x-coordinate'),ylabel('y-coordinate')
-set(gca,'YTick',5:10:30),set(gca,'XTick',5:10:30),
+set(gca,'YTick',YTicks),set(gca,'XTick',XTicks),pause(0.01)
 
-if saveFigures,export_fig(sprintf('figures/Exp-%04d-Detections.pdf',NoE),'-a1','-native','-transparent'); end
+if saveFigures,
+    export_fig(sprintf('figures/Exp-%04d-Detections.pdf',NoE),'-a1','-native','-transparent'); 
+    export_fig(sprintf('figures/Exp-%04d-Detections.png',NoE)); 
+end
 % print -dpsc 'Detections.eps'
 %% 1 Frame, JPDA
 % JPDA Parameters
@@ -207,7 +213,11 @@ figure,
         hold on
     end
     axis([Surv_region(1,:) Surv_region(2,:)])
-if saveFigures,export_fig(sprintf('figures/Exp-%04d-%s.pdf',NoE,Tracking_Scheme),'-a1','-native','-transparent'); end
+    daspect([0.7,1,1])
+set(gca,'FontName','Times','FontSize',16),
+% xlabel('x-coordinate'),ylabel('y-coordinate')
+set(gca,'YTick',YTicks),set(gca,'XTick',XTicks),pause(0.01)
+if saveFigures,export_fig(sprintf('figures/Exp-%04d-%s.pdf',NoE,Tracking_Scheme),'-a1','-native','-transparent');export_fig(sprintf('figures/Exp-%04d-%s.png',NoE,Tracking_Scheme)); end
 
 [dist_lospa1_jpda(NoE,:),loce_lospa1_jpda(NoE,:),carde_lospa1_jpda(NoE,:),~,~] = perf_asses(xy_GT,est_trk_j(1:2:3,:,:),OSPA,'No');
 clear Xtrg Ytrg XeT Ff est_trk_j X_tr_j Fr_tr_j JPDA_multiscale N_H tStart
@@ -240,7 +250,11 @@ figure,
         hold on
     end
     axis([Surv_region(1,:) Surv_region(2,:)])
-if saveFigures,export_fig(sprintf('figures/Exp-%04d-%s.pdf',NoE,Tracking_Scheme),'-a1','-native','-transparent'); end
+    daspect([0.7,1,1])
+set(gca,'FontName','Times','FontSize',16),
+% xlabel('x-coordinate'),ylabel('y-coordinate')
+set(gca,'YTick',YTicks),set(gca,'XTick',XTicks),pause(0.01)
+if saveFigures,export_fig(sprintf('figures/Exp-%04d-%s.pdf',NoE,Tracking_Scheme),'-a1','-native','-transparent');export_fig(sprintf('figures/Exp-%04d-%s.png',NoE,Tracking_Scheme)); end
 
 [dist_lospa1_jpdam(NoE,:),loce_lospa1_jpdam(NoE,:),carde_lospa1_jpdam(NoE,:),~,~] = perf_asses(xy_GT,est_trk_j(1:2:3,:,:),OSPA,'No');
 clear Xtrg Ytrg XeT Ff est_trk_j X_tr_j Fr_tr_j JPDA_multiscale N_H tStart
@@ -272,7 +286,11 @@ figure,
         hold on
     end
     axis([Surv_region(1,:) Surv_region(2,:)])
-if saveFigures,export_fig(sprintf('figures/Exp-%04d-%s.pdf',NoE,Tracking_Scheme),'-a1','-native','-transparent'); end
+    daspect([0.7,1,1])
+set(gca,'FontName','Times','FontSize',16),
+% xlabel('x-coordinate'),ylabel('y-coordinate')
+set(gca,'YTick',YTicks),set(gca,'XTick',XTicks),pause(0.01)
+if saveFigures,export_fig(sprintf('figures/Exp-%04d-%s.pdf',NoE,Tracking_Scheme),'-a1','-native','-transparent');export_fig(sprintf('figures/Exp-%04d-%s.png',NoE,Tracking_Scheme)); end
 
 [dist_lospa1_jpda_ha(NoE,:),loce_lospa1_jpda_ha(NoE,:),carde_lospa1_jpda_ha(NoE,:),~,~] = perf_asses(xy_GT,est_trk_j(1:2:3,:,:),OSPA,'No');
 clear Xtrg Ytrg XeT Ff est_trk_j X_tr_j Fr_tr_j JPDA_multiscale N_H tStart
@@ -304,7 +322,11 @@ figure,
         hold on
     end
     axis([Surv_region(1,:) Surv_region(2,:)])
-if saveFigures,export_fig(sprintf('figures/Exp-%04d-%s.pdf',NoE,Tracking_Scheme),'-a1','-native','-transparent'); end
+    daspect([0.7,1,1])
+set(gca,'FontName','Times','FontSize',16),
+% xlabel('x-coordinate'),ylabel('y-coordinate')
+set(gca,'YTick',YTicks),set(gca,'XTick',XTicks),pause(0.01)
+if saveFigures,export_fig(sprintf('figures/Exp-%04d-%s.pdf',NoE,Tracking_Scheme),'-a1','-native','-transparent');export_fig(sprintf('figures/Exp-%04d-%s.png',NoE,Tracking_Scheme)); end
 
 [dist_lospa1_ha(NoE,:),loce_lospa1_ha(NoE,:),carde_lospa1_ha(NoE,:),~,~] = perf_asses(xy_GT,est_trk_j(1:2:3,:,:),OSPA,'No');
 clear Xtrg Ytrg XeT Ff est_trk_j X_tr_j Fr_tr_j JPDA_multiscale N_H tStart
@@ -336,7 +358,11 @@ figure,
         hold on
     end
     axis([Surv_region(1,:) Surv_region(2,:)])
-
+daspect([0.7,1,1])
+set(gca,'FontName','Times','FontSize',16),
+% xlabel('x-coordinate'),ylabel('y-coordinate')
+set(gca,'YTick',YTicks),set(gca,'XTick',XTicks),pause(0.01)
+if saveFigures,export_fig(sprintf('figures/Exp-%04d-%s.pdf',NoE,Tracking_Scheme),'-a1','-native','-transparent');export_fig(sprintf('figures/Exp-%04d-%s.png',NoE,Tracking_Scheme)); end
 
 [dist_lospa1_LSTM(NoE,:),loce_lospa1_LSTM(NoE,:),carde_lospa1_LSTM(NoE,:),~,~] = perf_asses(xy_GT,est_trk_j(1:2:3,:,:),OSPA,'No');
 clear Xtrg Ytrg XeT Ff est_trk_j X_tr_j Fr_tr_j JPDA_multiscale N_H tStart
@@ -369,8 +395,11 @@ figure,
         hold on
     end
     axis([Surv_region(1,:) Surv_region(2,:)])
-
-if saveFigures,export_fig(sprintf('figures/Exp-%04d-%s.pdf',NoE,Tracking_Scheme),'-a1','-native','-transparent'); end
+daspect([0.7,1,1])
+set(gca,'FontName','Times','FontSize',16),
+% xlabel('x-coordinate'),ylabel('y-coordinate')
+set(gca,'YTick',YTicks),set(gca,'XTick',XTicks),pause(0.01)
+if saveFigures,export_fig(sprintf('figures/Exp-%04d-%s.pdf',NoE,Tracking_Scheme),'-a1','-native','-transparent');export_fig(sprintf('figures/Exp-%04d-%s.png',NoE,Tracking_Scheme)); end
 
 [dist_lospa1_LSTM_ha(NoE,:),loce_lospa1_LSTM_ha(NoE,:),carde_lospa1_LSTM_ha(NoE,:),~,~] = perf_asses(xy_GT,est_trk_j(1:2:3,:,:),OSPA,'No');
 clear Xtrg Ytrg XeT Ff est_trk_j X_tr_j Fr_tr_j JPDA_multiscale N_H tStart
@@ -378,7 +407,7 @@ clear Xtrg Ytrg XeT Ff est_trk_j X_tr_j Fr_tr_j JPDA_multiscale N_H tStart
 save('synthetic_results_new', 'dist*','loce*','carde*');
 
 %%
-mnames = {'jpda','jpdam','jpda_ha','ha','LSTM_ha','LSTM'};
+mnames = {'jpda','jpdam','jpda_ha','ha','LSTM','LSTM_ha'};
 errors = {'dist','idsw','carde'};
 fprintf('\nExperiment %d\n%10s|%10s|%10s|%10s|\n--------------------------------------------\n',NoE,'Method','Dist','IDSW','Carde');
 for m=1:length(mnames)
@@ -396,7 +425,7 @@ end
 
 
 %% Mean over all MC runs
-mnames = {'jpda','jpdam','jpda_ha','ha','LSTM_ha','LSTM'};
+mnames = {'jpda','jpdam','jpda_ha','ha','LSTM','LSTM_ha'};
 errors = {'dist','idsw','carde'};
 fprintf('\nOverall Mean\n%10s|%12s|%12s\n------------------------------------------------\n','Method','Dist', 'IDSW');
 for m=1:length(mnames)

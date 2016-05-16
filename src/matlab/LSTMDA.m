@@ -11,6 +11,7 @@ model_sign = sprintf('mt1_r%d_l%d_n%d_m%d_o1_s%d_i%d_valen',rnnSize, numLayers, 
 model_name = 'trainHun';
 % model_name = '0509LBc-2'; % trained on JPDA
 % model_name = '0511LBc-1'; % trained on JPDA_10
+model_name = '0513LAc-1'; % trained on JPDA_10
 
 allQ=reshape(probs', 1, N*N);
 allSol=reshape(eye(N), 1, N*N);

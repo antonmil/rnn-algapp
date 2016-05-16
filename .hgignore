@@ -16,3 +16,4 @@ src/matlab/parsearch/*
 src/matlab/tracking/Data*
 src/matlab/Data*
 src/matlab/tracking/Training_assignment_matrix/*
+src/matlab/tracking/figures/*
