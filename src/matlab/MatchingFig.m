@@ -1,13 +1,17 @@
 %%
-addpath(genpath('.'))
-nRuns = 1:1;
+addpath('.')
+addpath('external/export_fig')
+addpath(genpath('./Matching/'))
+addpath('~/software/gurobi603/linux64/matlab/')
+nRuns = 1;
 
-
+%%
 rng('shuffle');
 rng(3210323);
-if ~exist('Pair_M','var')
+% rng(321234);
+% if ~exist('Pair_M','var')
     [Pair_M, allGphs, allFs]=doMatching('Motor');
-end
+% end
 
 N=8;
 rnnSize = 64;
@@ -19,6 +23,10 @@ model_sign = sprintf('mt1_r%d_l%d_n%d_m%d_o2_s%d_i%d_valen',rnnSize, numLayers, 
 model_name = 'trainHun';
 model_name = '0502Fs-2'; % GOOD ONE (also 0502Fs-1)
 % model_name = '0504As-1'; %
+model_base = '0509QAc'; % paper?
+% model_base = '0517QBc'; % 
+model_run = 1;
+model_name = sprintf('%s-%d',model_base,model_run);
 
 mBst = 10;
 doRandomize = true;
@@ -26,7 +34,7 @@ doRandomize = true;
 
 allRes = {}; mInd = 0;
 
-
+%%
 fprintf('Testing %s - %s\n', model_name, model_sign);
 asgT.X=eye(N);
 
@@ -35,7 +43,7 @@ allFs = allFs;
 
 for r = nRuns
     fprintf('.');
-%     rng(3211211);
+    rng(3229);
     randSmpl = randi(length(Pair_M));
     RM = Pair_M{1,randSmpl};    
     [newK,gurResult,takePts] = selectSubset(RM, N, false, gurModel, gurParams);    
@@ -198,7 +206,7 @@ for r = nRuns
     
     
     mInd=mInd+1;
-    allRes{mInd}.name = 'LSTM';
+    allRes{mInd}.name = 'LSTM (loss)';
     allRes{mInd}.acc(r) = matchAsg(myResMat, asgT);
     allRes{mInd}.obj(r) = resVec(:)' * newK * resVec(:);
     allRes{mInd}.time(r) = resRaw(1,3);
@@ -215,7 +223,63 @@ for r = nRuns
 %     runInfos.rnnHunObj(r) = hunVec' * newK * hunVec;
 %     runInfos.rnnHunAcc(r) = matchAsg(matchHun, asgT);    
     mInd=mInd+1;
-    allRes{mInd}.name = 'LSTM-HA';
+    allRes{mInd}.name = 'LSTM-HA (loss)';
+    allRes{mInd}.acc(r) = matchAsg(matchHun, asgT);  
+    allRes{mInd}.obj(r) = hunVec' * newK * hunVec;
+    allRes{mInd}.time(r) = resRaw(1,3)+thun;
+    allRes{mInd}.resMat(:,:,r) = matchHun;
+
+%     pause
+    catch err
+        fprintf('WARNING. LSTM IGNORED. %s\n',err.message);
+    end
+
+    model_name = sprintf('%s-%d',model_base,2);
+    try
+    cmd = sprintf('cd ..; pwd; th %s.lua -model_name %s -model_sign %s -suppress_x 1 -test_file %s','test', ...
+        model_name , model_sign, testfilebase);
+    [a,b] = system(cmd);    
+    if a~=0
+%         fprintf('Error running RNN!\n'); b
+%         break;
+    end
+
+    resRaw = dlmread(sprintf('../../out/%s_%s.txt',model_name, model_sign));
+    runInfos.rnnTime(r) = resRaw(1,3);
+%     resRaw(:,1) = reshape(reshape(resRaw(:,1),N,N)',N*N,1);
+    resVec = resRaw(:,1);
+    [myResMat, myAss] = getOneHot(resVec);
+%     myAss
+    if length(unique(myAss)) ~= length(myAss)
+%         fprintf('RNN solution not one-to-one!\n')
+    end
+    
+%     obj = resVec(:)' * newK * resVec(:);
+%     acc = matchAsg(myResMat, asgT);
+%     fprintf('RNN Accuracy: %.2f\n',acc)        
+%     runInfos.allAcc(r)=acc;
+%     runInfos.allObj(r) = obj;
+    
+    
+    mInd=mInd+1;
+    allRes{mInd}.name = 'LSTM (obj)';
+    allRes{mInd}.acc(r) = matchAsg(myResMat, asgT);
+    allRes{mInd}.obj(r) = resVec(:)' * newK * resVec(:);
+    allRes{mInd}.time(r) = resRaw(1,3);
+    allRes{mInd}.resMat(:,:,r) = myResMat;
+    
+    % resolve with hungarian
+    resObj = resRaw(:,2);
+    resMat = reshape(resObj,N,N)';
+    thun = tic;
+    [matchHun, costHun] = hungarian(-resMat);
+    thun=toc(thun);
+    hunVec = reshape(matchHun',N*N,1);
+%     runInfos.rnnHunTime(r) = runInfos.rnnTime(r) + thun;
+%     runInfos.rnnHunObj(r) = hunVec' * newK * hunVec;
+%     runInfos.rnnHunAcc(r) = matchAsg(matchHun, asgT);    
+    mInd=mInd+1;
+    allRes{mInd}.name = 'LSTM-HA (obj)';
     allRes{mInd}.acc(r) = matchAsg(matchHun, asgT);  
     allRes{mInd}.obj(r) = hunVec' * newK * hunVec;
     allRes{mInd}.time(r) = resRaw(1,3)+thun;
@@ -226,9 +290,11 @@ for r = nRuns
         fprintf('WARNING. LSTM IGNORED. %s\n',err.message);
     end
     
-    genFig(2, r, allFs, allGphsSubSel, randSmpl, asgT, allRes);
-    genFig(6, r, allFs, allGphsSubSel, randSmpl, asgT, allRes);
-    genFig(7, r, allFs, allGphsSubSel, randSmpl, asgT, allRes);
+%     genFig(2, r, allFs, allGphsSubSel, randSmpl, asgT, allRes);
+%     genFig(6, r, allFs, allGphsSubSel, randSmpl, asgT, allRes);
+%     genFig(7, r, allFs, allGphsSubSel, randSmpl, asgT, allRes);
+%     genFig(8, r, allFs, allGphsSubSel, randSmpl, asgT, allRes);
+%     genFig(9, r, allFs, allGphsSubSel, randSmpl, asgT, allRes);
 
 end
 

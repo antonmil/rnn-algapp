@@ -1,10 +1,13 @@
+%% test on training data
+
+% trdata = load('../../data/train/QBP-map_m100_N8_M8-0503-214311.mat');
 %%
 addpath('.')
 addpath(genpath('./Matching/'))
 addpath('~/software/gurobi603/linux64/matlab/')
 % gurobi_setup
 
-nRuns = 1:10;
+nRuns = 1:10000;
 
 
 rng('shuffle');
@@ -41,36 +44,40 @@ asgT.X=eye(N);
 allGphsSubSel = allGphs;
 allFs = allFs;
 
+% objBetter=zeros(1,nRuns);
 for r = nRuns
     fprintf('.');
+    if ~mod(r,100), fprintf('\n'); end
     %     rng(3211211);
-    randSmpl = randi(length(Pair_M));
-    RM = Pair_M{1,randSmpl};
-    [newK,gurResult,takePts] = selectSubset(RM, N, false, gurModel, gurParams);
-    
-    for ii=1:2
-        allGphsSubSel{randSmpl}{ii}.Pt=allGphs{randSmpl}{ii}.Pt(:,takePts);
-        allGphsSubSel{randSmpl}{ii}.vis=allGphs{randSmpl}{ii}.vis(takePts',takePts);
-        allGphsSubSel{randSmpl}{ii}.G=allGphs{randSmpl}{ii}.G(takePts,:);
-        allGphsSubSel{randSmpl}{ii}.H=allGphs{randSmpl}{ii}.H(takePts,:);
-        allGphsSubSel{randSmpl}{ii}.XP=allGphs{randSmpl}{ii}.XP(1,takePts);
-    end
+%     randSmpl = randi(length(Pair_M));
+%     RM = Pair_M{1,randSmpl};
+%     [newK,gurResult,takePts] = selectSubset(RM, N, false, gurModel, gurParams);
+%     
+%     for ii=1:2
+%         allGphsSubSel{randSmpl}{ii}.Pt=allGphs{randSmpl}{ii}.Pt(:,takePts);
+%         allGphsSubSel{randSmpl}{ii}.vis=allGphs{randSmpl}{ii}.vis(takePts',takePts);
+%         allGphsSubSel{randSmpl}{ii}.G=allGphs{randSmpl}{ii}.G(takePts,:);
+%         allGphsSubSel{randSmpl}{ii}.H=allGphs{randSmpl}{ii}.H(takePts,:);
+%         allGphsSubSel{randSmpl}{ii}.XP=allGphs{randSmpl}{ii}.XP(1,takePts);
+%     end
     
     
     %     runInfos.gurTime(r) = gurResult.runtime;
     %     [gurMat, gurAss] = getOneHot(gurResult.x);
     
     % randomize
-    GTAss = 1:N;
-    if doRandomize
-        canSol = eye(N);
-        [newK, newSol, newOrder]=permuteResult(newK, canSol(:)');
-        [newSolMat, GTAss] = getOneHot(newSol);
-        asgT.X = eye(N);
-        asgT.X = asgT.X(GTAss',:);
-        %         asgT.X = asgT.X(:,GTAss);
-    end
+%     GTAss = 1:N;
+%     if doRandomize
+%         canSol = eye(N);
+%         [newK, newSol, newOrder]=permuteResult(newK, canSol(:)');
+%         [newSolMat, GTAss] = getOneHot(newSol);
+%         asgT.X = eye(N);
+%         asgT.X = asgT.X(GTAss',:);
+%         %         asgT.X = asgT.X(:,GTAss);
+%     end
     %     newK(~~newK) = rand;
+    newK = reshape(trdata.allQ(r,:),N*N,N*N)';
+    newK=sparse(newK);
     
     gurModel.Q = newK;
     gurResult = gurobi(gurModel, gurParams);
@@ -104,11 +111,13 @@ for r = nRuns
     
     
     % IPFP-S
-    [pars, algs] = gmPar(2);
+%     [pars, algs] = gmPar(2);
     
-    Ct = ones(sqrt(size(newK,1)));
-    asgIpfpS = gm(newK, Ct, asgT, pars{6}{:});
+%     Ct = ones(sqrt(size(newK,1)));
+%     asgIpfpS = gm(newK, Ct, asgT, pars{6}{:});
+    asgIpfpS.X = reshape(trdata.all_1_Proposals(r,:),N,N);
     IPFPVec = reshape(asgIpfpS.X,N*N,1);
+    
     
     mInd=mInd+1;
     allRes{mInd}.name = sprintf('IPFP-S');
@@ -124,16 +133,16 @@ for r = nRuns
     %     runInfos.IPFPAcc(r) = matchAsg(asgIpfpS.X', asgT);
     
     % IPFP 'opt-out-of-m'
-    asgIpfpSMbst = mBestIPFP(newK,mBst,GTAss);
-    [~,m] = max(asgIpfpSMbst.obj);
-    moptVec = reshape(asgIpfpSMbst.X(:,:,m),N*N,1);
-    
-    mInd=mInd+1;
-    allRes{mInd}.name = sprintf('IPFP-%dbstOpt',mBst);
-    allRes{mInd}.acc(r) = matchAsg(asgIpfpSMbst.X(:,:,m)', asgT);
-    allRes{mInd}.obj(r) = moptVec' * newK * moptVec;
-    allRes{mInd}.time(r) = sum(asgIpfpSMbst.time);
-    allRes{mInd}.resMat(:,:,r) = asgIpfpSMbst.X(:,:,m)';
+%     asgIpfpSMbst = mBestIPFP(newK,mBst,GTAss);
+%     [~,m] = max(asgIpfpSMbst.obj);
+%     moptVec = reshape(asgIpfpSMbst.X(:,:,m),N*N,1);
+%     
+%     mInd=mInd+1;
+%     allRes{mInd}.name = sprintf('IPFP-%dbstOpt',mBst);
+%     allRes{mInd}.acc(r) = matchAsg(asgIpfpSMbst.X(:,:,m)', asgT);
+%     allRes{mInd}.obj(r) = moptVec' * newK * moptVec;
+%     allRes{mInd}.time(r) = sum(asgIpfpSMbst.time);
+%     allRes{mInd}.resMat(:,:,r) = asgIpfpSMbst.X(:,:,m)';
     
     %     runInfos.moptTime(r) = sum(asgIpfpSMbst.time);
     %     runInfos.moptObj(r) = moptVec' * newK * moptVec;
@@ -141,33 +150,33 @@ for r = nRuns
     
     
     % marginals
-    mbstVec = reshape(asgIpfpSMbst.Xmbst,N*N,1);
-    %     runInfos.mbstTime(r) = sum(asgIpfpSMbst.time);
-    %     runInfos.mbstObj(r) = mbstVec' * newK * mbstVec;
-    %     runInfos.mbstAcc(r) = matchAsg(asgIpfpSMbst.Xmbst', asgT);
-    
-    mInd=mInd+1;
-    allRes{mInd}.name = sprintf('IPFP-%dbstMar',mBst);
-    allRes{mInd}.cite = 'Rezatofighi:2016:CVPR';
-    allRes{mInd}.acc(r) = matchAsg(asgIpfpSMbst.Xmbst', asgT);
-    allRes{mInd}.obj(r) = mbstVec' * newK * mbstVec;
-    allRes{mInd}.time(r) = sum(asgIpfpSMbst.time);
-    allRes{mInd}.resMat(:,:,r) = asgIpfpSMbst.Xmbst';
+%     mbstVec = reshape(asgIpfpSMbst.Xmbst,N*N,1);
+%     %     runInfos.mbstTime(r) = sum(asgIpfpSMbst.time);
+%     %     runInfos.mbstObj(r) = mbstVec' * newK * mbstVec;
+%     %     runInfos.mbstAcc(r) = matchAsg(asgIpfpSMbst.Xmbst', asgT);
+%     
+%     mInd=mInd+1;
+%     allRes{mInd}.name = sprintf('IPFP-%dbstMar',mBst);
+%     allRes{mInd}.cite = 'Rezatofighi:2016:CVPR';
+%     allRes{mInd}.acc(r) = matchAsg(asgIpfpSMbst.Xmbst', asgT);
+%     allRes{mInd}.obj(r) = mbstVec' * newK * mbstVec;
+%     allRes{mInd}.time(r) = sum(asgIpfpSMbst.time);
+%     allRes{mInd}.resMat(:,:,r) = asgIpfpSMbst.Xmbst';
     
     % marginals with Hungarian
-    thun = tic;
-    [matchHun, costHun] = hungarian(-asgIpfpSMbst.marginals);
-    thun=toc(thun);
-    hunVec = reshape(matchHun,N*N,1);
-    %     runInfos.mbstHATime(r) = runInfos.mbstTime(r) + thun;
-    %     runInfos.mbstHAObj(r) = hunVec' * newK * hunVec;
-    %     runInfos.mbstHAAcc(r) = matchAsg(matchHun', asgT);
-    mInd=mInd+1;
-    allRes{mInd}.name = sprintf('IPFP-%dbstMarHA',mBst);
-    allRes{mInd}.acc(r) = matchAsg(matchHun', asgT);
-    allRes{mInd}.obj(r) = hunVec' * newK * hunVec;
-    allRes{mInd}.time(r) = allRes{mInd-1}.time(r) + thun;
-    allRes{mInd}.resMat(:,:,r) = matchHun';
+%     thun = tic;
+%     [matchHun, costHun] = hungarian(-asgIpfpSMbst.marginals);
+%     thun=toc(thun);
+%     hunVec = reshape(matchHun,N*N,1);
+%     %     runInfos.mbstHATime(r) = runInfos.mbstTime(r) + thun;
+%     %     runInfos.mbstHAObj(r) = hunVec' * newK * hunVec;
+%     %     runInfos.mbstHAAcc(r) = matchAsg(matchHun', asgT);
+%     mInd=mInd+1;
+%     allRes{mInd}.name = sprintf('IPFP-%dbstMarHA',mBst);
+%     allRes{mInd}.acc(r) = matchAsg(matchHun', asgT);
+%     allRes{mInd}.obj(r) = hunVec' * newK * hunVec;
+%     allRes{mInd}.time(r) = allRes{mInd-1}.time(r) + thun;
+%     allRes{mInd}.resMat(:,:,r) = matchHun';
     
     % LSTM
     allQ=full(newK); allQ=allQ(:)';
