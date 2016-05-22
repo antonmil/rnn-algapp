@@ -58,6 +58,7 @@ cmd:option('-grad_replace',1,'Replace better predictions with 0 gradient')
 cmd:option('-diverse_solutions',1,'take an improved m-bst solution iteratively')
 cmd:option('-mbst',0,'how many diverse solutions to consider?')
 cmd:option('-normalize',1,'Normalize data to [0,1]?')
+cmd:option('-replace_gt',1,'Iteratively refine Ground Truth with predictions?')
 -- optimization
 cmd:option('-lrng_rate',1e-2,'learning rate')
 cmd:option('-lrng_rate_decay',0.99,'learning rate decay')
@@ -472,6 +473,7 @@ function feval()
   
   local energies = GTEnergy:cat(predEnergy, 3) -- [GT, PRED]
   
+--  print(energies)
   local solv, takeSol = torch.max(energies, 3)
   takeSol=takeSol:reshape(opt.mini_batch_size, 1):eq(2) -- keep prediction?
 --  print(torch.sum(takeSol)/opt.mini_batch_size*100 .. '% of GT replaced by prediction')
@@ -498,6 +500,7 @@ function feval()
 --  print(predMeanEnergyProj)
 --  abort()
 
+
   if opt.grad_replace ~= 0 then
     if opt.solution=='distribution' then
       if opt.inference == 'map' then 
@@ -511,9 +514,37 @@ function feval()
       end
     elseif opt.solution == 'integer' then
       mi = dataToGPU(mi)
-      huns[takeSol:expand(opt.mini_batch_size, opt.max_n)] = mi:reshape(opt.mini_batch_size, opt.nClasses)
-    end    
+      local takeSolBin = takeSol:expand(opt.mini_batch_size, opt.max_n)
+      huns[takeSolBin] = mi:reshape(opt.mini_batch_size, opt.nClasses)[takeSolBin]
+    end
+
+    if percReplaced>0 then
+--      print('take Sol')
+--      print(takeSol:expand(opt.mini_batch_size, opt.max_n))
+--      print(mi:reshape(opt.mini_batch_size, opt.nClasses))
+--      print('training')
+--      print(TrSolTab[randSeq])
+--      print('new training')
+--      print(huns)
+--      sleep(5)
+    end
+    if opt.replace_gt ~= 0 then
+--      print(TrSolTab[randSeq])
+--      print(huns)
+--      abort()
+      TrSolTab[randSeq] = huns:clone()
+      
+    end
+    if percReplaced>0 then
+--      print('take Sol')
+--      print(takeSol)
+--      print(TrSolTab[randSeq])
+--      print(huns)
+--      abort()
+    
+    end
   end
+  
 --  print(huns)
 
 
